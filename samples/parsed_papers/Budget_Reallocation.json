@@ -1,0 +1,757 @@
+{
+    "title": "The Larger the Better? Improved LLM Code-Generation via Budget Reallocation",
+    "caption": "Different ways to improve LLM performance by increasing compute budget",
+    "authors": "Michael Hassid;  Tal Remez; Jonas Gehring; Roy Schwartz; Yossi Adi",
+    "pub_date": "",
+    "abstract": "It is a common belief that large language models (LLMs) are better than smaller-sized ones. However, larger models also require significantly more time and compute during inference. This begs the question: what happens when both models operate under the same budget? (e.g., compute, run-time). To address this question, we analyze code generation LLMs of various sizes and make comparisons such as running a 70B model once vs. generating five outputs from a 13B model. We consider a standard unit-test setup, which can be used to select the correct output from the smaller model. Our findings reveal that the repeated use of smaller models can yield consistent improvements, with gains of up to 15% across five tasks. On the other hand, in scenarios where unit-tests are unavailable, a ranking-based selection of candidates from the smaller model falls short of the performance of a single output from larger ones. Our results highlight the potential of using smaller models instead of larger ones, and the importance of studying approaches for ranking LLM outputs. 1 * Equal contribution 1 Data is avalible at https://github.com/slp-rl/budget-realloc",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": "A common wisdom in deep learning, and language modeling in particular, is that investing more compute leads to improved performance (Kaplan et al., 2020). The standard way of implementing this principle is training larger models. A simpler, yet often overlooked way to increase compute budget is to run a smaller model multiple times, and select the best output using some metric (Chen et al., 2021). In this work we systematically compare between these two approaches: we ask whether, given a fixed compute budget, it is best to run a large model once, or a smaller model multiple times (Figure 1). Our results show that, perhaps surprisingly, given the same compute budget, running 7B or 13B models can not only match the performance of a 70B model, but also substantially surpass it.\nAddressing our research question requires a method for selecting the best LLM output from a given set of candidates. In this work we focus on execution based code-generation tasks, which assume the availability of unit-tests (Chen et al., 2021;Austin et al., 2021;Hendrycks et al., 2021). We consider the widely-used pass@k metric (Kulal et al., 2019), which evaluates a model's performance on code generation problems by generating k outputs and assigning a point if any of them passes all tests. To adapt this metric for our purposes, we take models of different sizes, and for each generate as many outputs as possible given a fixed compute budget, e.g., floating point operations (FLOPs) or wall-time.\nWe apply this setup to evaluate the Code Llama (Roziere et al., 2023) model family (7B, 13B, 34B, and 70B) across five tasks: HumanEval (Chen et al., 2021), MBPP (Austin et al., 2021), and the three splits of APPS (Hendrycks et al., 2021). For the HumanEval and MBPP benchmarks, we additionally use the recent Llama-3 (AI@Meta, 2024) model family (8B and 70B). Surprisingly, we find that for the two popular tasks, HumanEval and MBPP, the Figure 1: Different ways to improve LLM performance by increasing compute budget. Top: the standard approach of increasing model size, while generating a single output. Bottom: our approach-using a small model to generate multiple outputs, and select the best one. smaller models (7B, 8B and 13B) outperform the larger ones (34B and 70B) by a margin of up to 15%. Importantly, this is observed using both budget types (FLOPs and wall-time) and across all computation budgets. When considering the challenging APPS benchmark, we find that the 13B model performs best across almost all budgets, with a consistent margin of 5% when considering the hardest split-competition.\nWe then proceed to examine the scenario where unit-tests are unavailable, such as in an IDE code-completion setup. In such cases, an efficient policy is required to select a single solution from all generated ones. We consider a simple LLM-based policy, which ranks solutions based on the negative log likelihood of the LLM. We also augment this policy with a variant of a recent ranking approach-LEVER (Ni et al., 2023). We experiment with the 7B model, and rank its outputs using each of the models. Our results show that, as expected, ranking-based selection improves with the increase in compute budget, and with the size of the ranking LLM. Nonetheless, this procedure still falls short of the performance achieved by running the larger model independently with the same budget.\nOur results highlight the potential of using smaller models instead of larger ones, a practice that has many benefits. First, small models are far computationally cheaper to pre-train.2 Further, at inference time, they are considerably more hardware-friendly: a 13B model can be accommodated on a single A100 GPU, a feat unachievable for a 70B model (Dettmers et al., 2022). Finally, as we have shown, when controlling for the compute budget, smaller models may actually outperform larger ones.\nOur findings also emphasize the importance of developing effective ranking approaches for LLM outputs. This is especially important in cases where no unit-tests or other verification methods are available (Zou et al., 2021;Uesato et al., 2022;Sun et al., 2023). To support such research direction, we release 2, 000 Code Llama 7B outputs for each example in HumanEval and MBPP-a total of more than 1M outputs. 1",
+            "publication_ref": [
+                "b21",
+                "b3",
+                "b3",
+                "b1",
+                "b16",
+                "b23",
+                "b32",
+                "b3",
+                "b1",
+                "b16",
+                "b28",
+                "b9",
+                "b46",
+                "b41",
+                "b37"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluation under Compute Restrictions",
+            "text": "To study our main research question-what is the optimal way of using a given LLM compute budget-we consider a code-generation setup with unit-tests (Chen et al., 2021;Austin et al., 2021;Hendrycks et al., 2021). Below we discuss our methodology for code generation evaluation under computational restrictions. We begin by describing pass@k (Kulal et al., 2019), the current main approach for evaluating code generation tasks (Section 2.1). We then transition to describe our variant of code generation metrics under computational restrictions (Section 2.2).",
+            "publication_ref": [
+                "b3",
+                "b1",
+                "b16",
+                "b23"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Standard Code Generation Evaluation",
+            "text": "To evaluate LLM code-generation abilities, a common setup assumes a set of coding questions, each with a set of unit-tests. The LLM is fed with each question, and a fixed number of output generations (labelled k) are sampled. The evaluation protocol considers each question for which at least one output passes all unit-tests as correct. To estimate the performance of a model that generates k outputs, it is common to generate a larger number of outputs n (> k) and compute:\npass@k := E Problems 1 - ( n-c k ) ( n k ) ,(1)\nwhere c ≤ n is the number of examples that pass the unit-tests. The above mentioned metric results in an unbiased estimator as was shown by Chen et al. (2021).",
+            "publication_ref": [
+                "b3"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Comparing LLMs of Different Sizes under a Fixed Budget",
+            "text": "Our goal is to compare between LLMs of different sizes under a fixed compute budget. To do so, we allow smaller models, which consume fewer resources, to generate more outputs. This results in models of different sizes requiring roughly the same amount of compute.\nWe consider two types of compute budgets: the number of FLOPs and wall-time. For each type, a specific resource limit is set (e.g., 10k Tera-FLOPs or 8 seconds), and the model generates examples up to the point where the compute limit is reached. That is:\npass flops @ f := pass@k where:\nk = max flops(k ′ )≤ f k ′ ,(2)\npass time @t := pass@k where:\nk = max time(k ′ )≤t k ′ ,(3)\nwhere flops(k) and time(k) are functions that return the FLOPs/wall-time usage of a given model that generates k outputs. Notably, the FLOPs restriction is a more theoretical computational restriction, as it assumes perfect utilization of the hardware. On the other hand, the wall-time restriction is more realistic, but is hardware specific, and thus not directly comparable across different machines.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimental Setup",
+            "text": "In this section we describe our experimental setup, focusing on the code benchmarks used (Section 3.1), our metrics (Section 3.2), and our experiments (Section 3.3).",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Benchmarks",
+            "text": "We experiment with three python code benchmarks: HumanEval (Chen et al., 2021), MBPP (Austin et al., 2021) and APPS (Hendrycks et al., 2021). The HumanEval benchmark consists of 164 function declarations alongside their documentation. The Code-LLM's task is to complete the function according to the provided documentation. MBPP consists of 500 test examples, each one is an instruction for a code function. Here, the Code-LLM is required to generate the full function. Lastly, the test subset of APPS is composed of 5k programming problems at various levels of difficulty: introductory (1k), interview (3k) and competition (1k). In the APPS tasks, the Code-LLM is required to generate the complete python file, which includes import declarations, class definitions, and so on.",
+            "publication_ref": [
+                "b3",
+                "b1",
+                "b16"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Metrics",
+            "text": "Computing the pass flops @ f and pass time @t metrics requires an estimation of the flops(k) and time(k) functions from Equations ( 2) and (3). To estimate FLOPs usage, we use the calflops library (xiaoju ye, 2023), with input sequence length of 128. We measure wall-time while  1, for readability we also report the normalized factor with respect to the 7B model.3 ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Experiments",
+            "text": "We experiment with the Code Llama family (Roziere et al., 2023), a finetuned version of Llama (Touvron et al., 2023). Code Llama comes in various sizes, which we use for our experiments: 7B, 13B, 34B and 70B. For the smaller benchmarks, HumanEval and MBPP, we also consider the Llama-3 family (8B and 70B).\nWe follow Roziere et al. ( 2023), and use a zero-shot setting for HumanEval, a 3-shot prompting strategy for MBPP and 2-shot prompts for APPS, and limit the generation length to 512/256/256 tokens for HumanEval/MBPP/APPS. For the sampling process, we use nucleus sampling (Holtzman et al., 2019) with top-p = 0.95 and a temperature of 0.8/0.8/0.6 for HumanEval/MBPP/APPS, with all models sizes (Roziere et al., 2023). Finally, we also report, the pass@1 results using a greedy decoding method for all models.\nTo compare models in varying sizes, we select the maximal number of generations for each model with respect to the values in Table 1. Specifically, for the smaller benchmarks, HumanEval and MBPP, we generate n = 2, 000/1, 000/400/200 answers for the 7-8B/13B/34B/70B models, respectively. For the larger benchmarks, the three splits of APPS, we use n = 1, 000/500/200/100. To get a robust estimation of these measures, we follow Chen et al. (2021) and Roziere et al. (2023), and report for all benchmarks a maximal value of k = n 2 for the pass@k metric, while using all available unit-tests.",
+            "publication_ref": [
+                "b32",
+                "b39",
+                "b20",
+                "b32",
+                "b3",
+                "b32"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Small Models Outperform Large Ones under a Fixed Compute Budget",
+            "text": "Results for HumanEval and MBPP using the Code Llama models are presented in Figures 2 and3, respectively. 4 The corresponding results for the Llama-3 models can be found in Figures 10 and11 (Appendix A). We first note that, as expected, the pass@k metric improves both with model scale, and with the number of generations k (sub-figure (a) in all figures). However, perhaps surprisingly, when considering the pass flops @ f and pass time @t metrics (sub-figures (b) and (c)), we see a different trend-given a fixed compute budget, smaller models yield better results than larger ones. Specifically, the 7B/8B/13B models outperform the larger models across all compute budgets. Particularly, in the small budget regime (up to 32 normalized FLOPs units and 64 wall-time units) the performance gap reaches 5-15%.\nAnother way of looking at our results is by observing that smaller models match the performance of larger ones using substantially lower budgets. For instance, in HumanEval, the Code Llama 7B and 13B models achieve a score of 60% using one quarter of the time it takes the larger models to reach that score. This efficiency gap further increases with the Figure 3: Code Llama performance vs. compute for the MBPP benchmark. As in Hu-manEval (Figure 2), larger models perform better as a function of k (Figure 3a), but worse under a fixed compute budget (Figures 3b and3c). Llama-3 models (Figure 10c). Finally, we compare small models to greedy decoding with larger models, which generally performs better than sampling. We observe that even in this setup, using the smaller models several times is equivalent or preferable in all cases.\nWe next turn to discuss the Code Llama results over the three splits of the APPS benchmark (Figures 4 to 6). 5 We first consider the 13B model, and observe the same trends as in HumanEval and MBPP: this model achieves the best performance in almost all fixed compute budgets. Specifically for the competition split (Figures 6b and6c), the most challenging APPS split, the 13B model outperforms all other models in all compute budgets, with a consistent margin of ≈5% from the 70B model when considering the wall-time budget. We further observe that the 13B model achieves similar or better performance as the greedy approach of all models in all three splits. Finally, when fixing the performance, the 13B model is 2-4 times more efficient than the 70B model (both for FLOPs and wall-time).\nWe next observe that the 7B model is also competitive with larger models in small budget regimes (up to 8 normalized FLOPs units and 16 wall-time units). Nonetheless, it slightly underperforms the other models on larger budgets. This can be attributed to the 7B model's inability to generate a sufficient number of correct answers for the task, and may suggest that there is a minimum size requirement for a certain level of task difficulty.\nOur results indicate that small models can match or even outperform large ones under a fixed compute budget, assuming the availability of unit-tests. An intriguing aspect of our research question is what happens when unit-tests are unavailable, and a single selection among several generations must be made. We delve into this topic in the following section.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_7",
+                "fig_7",
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluating Code Generation without Unit-tests",
+            "text": "We examine the scenario where unit-tests are not available (e.g., IDE code-completion setup). In this case, an efficient selection policy strategy may be used to select one answer from the model's generations. In the previous cases (Section 2), unit-tests served as this policy.\nHere we investigate using ranking as a selection policy. In Section 5.1 we show how to estimate the performance of a model given such a strategy, and in Section 5.2 we analyze the performance of larger models as rankers for a small model. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluating Rankers",
+            "text": "We assume a model that generates k outputs, and a policy that ranks them. To estimate the performance of such setup, we count the number of groups containing k generations where the highest-ranked generation within them is a correct one. That is:\nrank-score@k := E Problems 1 ( n k ) • n-k+1 ∑ i=1 n -i k -1 • pass i , (4\n)\nwhere n(>k) is the number of answers generated for the estimation, and [pass 1 , pass 2 , . . . , pass n ] ∈ {0, 1} n are the pass scores sorted according to the ranking policy. That is, pass i is 1 if the example ranked i according to the policy is correct, and 0 otherwise. See Figure 7 for a python implementation of rank-score@k.\nSimilarly to Equations ( 2) and (3), we also define:\nrank-score flops @ f := rank-score@k where:\nk = max flops(k ′ )≤ f k ′ , (5\n)\nrank-score time @t := rank-score@k where:\nk = max time(k ′ )≤t k ′ , (6\n)\nwhere flops(k) and time(k) are the same functions as in Section 2.2. Next, we evaluate the performance of large models as rankers using the above metrics.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Large Language Models as Rankers",
+            "text": "We examine the usage of LLMs as rankers. To produce a ranking order over a set of generations, we use the averaged Negative Log Likelihood (NLL) the LLM assigns to each generation (excluding the prompt), and rank the generations according to that score. It should be noted that extracting the NLL of a model over a given generation can be done in a parallel manner (i.e., non-autoregressively), which is substantially faster than traditional token-by-token generation. The score given by a model to a generation G = (w 1 , . . . , w l ) given a prompt P is:\nscore model = NLL model (G|P) = - 1 l l ∑ i=1 log p model (w i |w i-1 , . . . , w 1 , P) . (7\n)\nTo study the performance of LLMs as rankers we use the HumanEval and MBPP benchmarks. We use 2, 000 generations produced by Code Llama 7B as described in Section 3.3. As rankers we use all four Code Llama model sizes. We discard any generation that fails to complete, i.e. reached the maximal number of generated tokens without producing an end-of-sequence token. We also report the performance of running each model independently with one generation budget (both greedy and sampling). Figure 8: rank-score time @t as a function of wall-time for HumanEval (left) and MBPP (right), using different rankers (different lines). Greedy sampling is marked as a star, and top-p sampling as a circle. While ranking results improve with the size of the ranker and with compute budget, they still fall short of greedy decoding with larger models.\nOur results are presented in Figure 8. As can be seen, using LLMs as rankers over generations obtained from smaller models improves performance. Interestingly, we observe that using a 7B model as a ranker for itself can enhance its generation even further than the greedy approach, albeit with the cost generating several outputs. We also find that using larger models as rankers results in better perfomance. When considering a fixed compute budget, we find that it is sometimes comparable to use LLMs as rankers instead of sampling from them, as can be seen with the 13B and 34B models. However, this is not the case for the greedy approach which consistently outperforms ranking multiple generations from a smaller model given a fixed compute budget. To further check the use of external verifiers, we integrate the LEVER verifier model (Ni et al., 2023) with the Code Llama models. The LEVER approach aims to enhance code generation by learning to verify generated programs. The full LEVER pipeline involves using the NLL produced by the code generation model, error pruning based on execution, and a verifier trained on code generations with execution results. However, since we assume that no tests are available in our setting, execution pruning and execution results cannot be used. LEVER released a trained verifier over the MBPP benchmark, which we use along with the NLL scores of each model. As shown in Figure 9, the LEVER verifier does not improve the results in the test-less setting, which is expected given that one of the main components of the approach relies on execution over unit-tests.\nIn summary, there remains a gap to bridge between using LLMs as rankers for smaller models and using them as generators. To further promote this line of research, we release the 2, 000 generations per example produced by the 7B model for both HumanEval and MBPP (a total of 1, 328, 000 generations).\n6 Related Work",
+            "publication_ref": [
+                "b28"
+            ],
+            "figure_ref": [
+                "fig_5"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Model Scaling",
+            "text": "Model scaling was found to be one of the key elements in the success of LLMs (Dehghani et al., 2023;Gu et al., 2023;Hassid et al., 2023;Rae et al., 2021;Chowdhery et al., 2023;Touvron et al., 2023), with Wei et al. (2022) demonstrating how specific abilities emerge mainly after reaching a specific scale. The way language models behave when they are scaled up and their ability to adjust have been a significant factor in the creation of LLMs (Hernandez et al., 2021). Kaplan et al. (2020) investigated the optimal model size to train for a given compute budget, while Hoffmann et al. (2022) demonstrated how scaling both model and dataset sizes improves performance across various tasks. Clark et al. (2022) analyzed the scaling properties of mixture-of-experts models, showing that scaling with the number of experts diminishes as model size increases. Recently, Gadre et al. ( 2024) provided a scaling law analysis considering downstream tasks rather than next-token prediction loss. They related the perplexity of a language model to its downstream task performance via a power law and used it to predict the top-1 error averaged over the evaluated downstream tasks.\nOur work differs from all of the above, as we do not claim to provide new scaling laws but rather suggest that when fixing the budget, smaller models can provide comparable or superior results to larger ones.\nRecent studies by Shi et al. (2024) and Mei et al. (2024) have demonstrated that under constrained compute budgets, smaller vision models can surpass their larger counterparts. Specifically, Shi et al. (2024) found advantages in using multiple image scales, whereas Mei et al. (2024) observed that smaller diffusion models perform better than larger ones when the compute budget is fixed. Our approach, which generates multiple text outputs from a small model, aligns with these findings.",
+            "publication_ref": [
+                "b8",
+                "b13",
+                "b14",
+                "b31",
+                "b4",
+                "b39",
+                "b42",
+                "b17",
+                "b21",
+                "b19",
+                "b5",
+                "b35",
+                "b27",
+                "b35",
+                "b27"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Verifiers and Rankers",
+            "text": "LLM verifiers and rankers is a growing trend, which leverages LLMs to verify and rank generations obtained from weaker and smaller models (Cobbe et al., 2021b;Uesato et al., 2022;Saha et al., 2024;Havrilla et al., 2024). Both Cobbe et al. (2021b) and Uesato et al. (2022) leveraged an external classifier to rank LLM outputs. Specifically, in both setups the authors proposed to generate many candidate solutions and select the one ranked highest by the verifier. The authors demonstrated the applicability of using such verifiers in solving math word problems (Cobbe et al., 2021a). Qin et al. (2023) demonstrated that LLMs can serve as efficient text rankers when considering pairwise ranking.\nAnother line of work leveraged LLMs to evaluate the quality of smaller models (Saha et al., 2024;Dubois et al., 2023;Zheng et al., 2023;Oren et al., 2024). Although providing a promising alternative, such evaluation suffers from biases in the larger model (Zheng et al., 2023) and reliance on hand-designed evaluation plans that impact the method's ability to generalize (Liu et al., 2023). Large models also serve as verifiers of small ones in a speculative decoding setup, with the goal of speeding-up LLM generation (Leviathan et al., 2023;Kim et al., 2023;Chen et al., 2023). It is also common to distill knowledge from a large model into a smaller one in order to improve efficiency (Hinton et al., 2015;Sanh et al., 2019;Xu et al., 2024), see Treviso et al. (2023) for a survey on efficient methods in NLP.\nIn this work, we explore the potential of LLMs as selectors of the best output of a smaller model in a fixed budget setup. Similarly to ours, Li et al. (2024) found that smaller sized LMs (7B parameters) already exhibit strong mathematical abilities when selecting the best response from k different generations. When considering code generation models, Al-phaCode Team (2023) presented impressive results on challenging coding contests tasks while generating 1M samples, and later on filtering and ranking them using Gemini-Pro LLM (Team et al., 2023). Dou et al. (2024) proposed a method to improve code-generation models by learning a policy model using reinforcement learning methods. Lastly, Shi et al. ",
+            "publication_ref": [
+                "b41",
+                "b33",
+                "b15",
+                "b41",
+                "b30",
+                "b33",
+                "b11",
+                "b45",
+                "b29",
+                "b45",
+                "b26",
+                "b24",
+                "b22",
+                "b2",
+                "b18",
+                "b34",
+                "b44",
+                "b40",
+                "b25",
+                "b38",
+                "b10"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Discussion & Limitations",
+            "text": "Our results show that using smaller models with the same amount of compute can improve LLM code-generation performance. An interesting question we do not fully address is whether, given enough compute, the larger models will overtake the smaller ones, or perhaps they will all saturate at a similar performance level at some point. Our HumanEval and MBPP results seem to slightly support the latter hypothesis (as all models begin to saturate, see Figures 2 and3). However, unfortunately, due to compute constraints, our setting is restricted to exploring only a limited number of generations per model. 6 We note that despite this limitation, in practice, due to these costs our conclusions apply to most practical use-cases. We defer more expensive experiments to future work.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": "In this work, we compared large language models with smaller-sized models under fixed budget constraints (i.e., FLOPs and wall-time). We evaluated the models using executionbased code-generation tasks, which provide access to unit-tests. Our findings reveal that generating multiple outputs from a 13B model may lead to gains of up to 15% over a single generation from a 70B model across five tasks. This highlights the potential of using smaller models instead of larger ones. In scenarios where unit tests or other solution verifiers are unavailable, we explored a simple ranking-based approach for candidate selection. We found the proposed ranking approach falls short in performance compared to a single output from the larger model. Our findings emphasize the importance of studying approaches for ranking LLM outputs, which hold great potential to not only improve model performance but also improve budget allocation. To further enhance this research direction we release over 1M samples from the Code Llama 7B models spanning both HumanEval and MBPP benchmarks. Figure 11: Llama-3 performance vs. compute for the MBPP benchmark. As in Hu-manEval (Figure 10), larger models perform better as a function of k (Figure 11a), but worse under a fixed compute budget (Figures 11b and11c).",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_7"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "A Llama-3 Results",
+            "text": "We present Llama-3 results for the HumanEval and MBPP benchmarks in Figures 10 and11, respectively.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_7"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "B Detailed pass@k Results",
+            "text": "In Tables 2 to 4 presents precise pass@k results for the datasets examined (HumanEval, MBPP and APPS, respectively). Due to the infeasibility of reporting results for all k, we provide results for selected k values. Nevertheless, it is important to note that all relevant k values were calculated and used in the computation of the figures. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgments",
+            "text": "We thank Miri Varshavsky Hassid for the great feedback and moral support.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "",
+            "text": "Code Llama 7B 28.2 38.5 48.9 68.7 83.9 89.0 92.7 95.0 96.3 Code Llama 13B 32.7 44.4 56.2 77.0 89.0 92.3 94.8 96.5 -.-Code Llama 34B 38.6 51.4 63.4 81.8 91.7 94.3 -.--.--.-Code Llama 70B 46.7 61.1 73.2 87.3 94.4 Code Llama 7B 37.3 48.0 57.3 71.6 81.1 84.8 87.9 90.3 92.4 Code Llama 13B 42.3 53.4 62.5 75.3 84.0 87.4 90.4 92.8 -.-Code Llama 34B 49.2 60.1 68.6 79.2 85.8 88.7 -.--.--.-Code Llama 70B 57.3 67.7 74.8 83.7 90.0",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "",
+            "text": "Published as a conference paper at COLM 2024  ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Google DeepMind AlphaCode Team. Alphacode 2 technical report",
+            "journal": "",
+            "year": "2023",
+            "authors": ""
+        },
+        {
+            "ref_id": "b1",
+            "title": "Program synthesis with large language models",
+            "journal": "",
+            "year": "2021",
+            "authors": "Jacob Austin; Augustus Odena; Maxwell Nye; Maarten Bosma; Henryk Michalewski; David Dohan; Ellen Jiang; Carrie Cai; Michael Terry; Quoc Le"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Accelerating large language model decoding with speculative sampling",
+            "journal": "",
+            "year": "2023",
+            "authors": "Charlie Chen; Sebastian Borgeaud; Geoffrey Irving; Jean-Baptiste Lespiau; Laurent Sifre; John Jumper"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Evaluating large language models trained on code",
+            "journal": "",
+            "year": "2021",
+            "authors": "Mark Chen; Jerry Tworek; Heewoo Jun; Qiming Yuan; Henrique Ponde De Oliveira Pinto; Jared Kaplan; Harri Edwards; Yuri Burda; Nicholas Joseph; Greg Brockman; Alex Ray; Raul Puri; Gretchen Krueger; Michael Petrov; Heidy Khlaaf; Girish Sastry; Pamela Mishkin; Brooke Chan; Scott Gray; Nick Ryder; Mikhail Pavlov; Alethea Power; Lukasz Kaiser; Mohammad Bavarian; Clemens Winter; Philippe Tillet; Felipe Petroski Such; Dave Cummings; Matthias Plappert; Fotios Chantzis; Elizabeth Barnes; Ariel Herbert-Voss; William Hebgen Guss; Alex Nichol; Alex Paino; Nikolas Tezak; Jie Tang; Igor Babuschkin; Suchir Balaji; Shantanu Jain; William Saunders; Christopher Hesse; Andrew N Carr; Jan Leike; Josh Achiam; Vedant Misra; Evan Morikawa; Alec Radford; Matthew Knight; Miles Brundage; Mira Murati; Katie Mayer; Peter Welinder; Bob Mcgrew; Dario Amodei; Sam Mccandlish; Ilya Sutskever; Wojciech Zaremba"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Palm: Scaling language modeling with pathways",
+            "journal": "Journal of Machine Learning Research",
+            "year": "2023",
+            "authors": "Aakanksha Chowdhery; Sharan Narang; Jacob Devlin; Maarten Bosma; Gaurav Mishra; Adam Roberts; Paul Barham; Hyung Won Chung; Charles Sutton; Sebastian Gehrmann"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Unified scaling laws for routed language models",
+            "journal": "PMLR",
+            "year": "2022",
+            "authors": "Aidan Clark; Diego De Las; Aurelia Casas; Arthur Guy; Michela Mensch; Jordan Paganini; Bogdan Hoffmann; Blake Damoc; Trevor Hechtman; Sebastian Cai;  Borgeaud"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Training verifiers to solve math word problems",
+            "journal": "",
+            "year": "2021",
+            "authors": "Karl Cobbe; Vineet Kosaraju; Mohammad Bavarian; Mark Chen; Heewoo Jun; Lukasz Kaiser; Matthias Plappert; Jerry Tworek; Jacob Hilton; Reiichiro Nakano; Christopher Hesse; John Schulman"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Training verifiers to solve math word problems",
+            "journal": "",
+            "year": "2021",
+            "authors": "Karl Cobbe; Vineet Kosaraju; Mohammad Bavarian; Mark Chen; Heewoo Jun; Lukasz Kaiser; Matthias Plappert; Jerry Tworek; Jacob Hilton; Reiichiro Nakano"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Scaling vision transformers to 22 billion parameters",
+            "journal": "PMLR",
+            "year": "2023",
+            "authors": "Mostafa Dehghani; Josip Djolonga; Basil Mustafa; Piotr Padlewski; Jonathan Heek; Justin Gilmer; Andreas Peter Steiner; Mathilde Caron; Robert Geirhos; Ibrahim Alabdulmohsin"
+        },
+        {
+            "ref_id": "b9",
+            "title": "8-bit matrix multiplication for transformers at scale",
+            "journal": "",
+            "year": "2022",
+            "authors": "Tim Dettmers; Mike Lewis; Younes Belkada; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Stepcoder: Improve code generation with reinforcement learning from compiler feedback",
+            "journal": "",
+            "year": "2024",
+            "authors": "Shihan Dou; Yan Liu; Haoxiang Jia; Limao Xiong; Enyu Zhou; Junjie Shan; Caishuang Huang; Wei Shen; Xiaoran Fan; Zhiheng Xi"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Alpacafarm: A simulation framework for methods that learn from human feedback",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yann Dubois; Chen Xuechen Li; Rohan Taori; Tianyi Zhang; Ishaan Gulrajani; Jimmy Ba; Carlos Guestrin; Percy S Liang; Tatsunori B Hashimoto"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Language models scale reliably with over-training and on downstream tasks",
+            "journal": "",
+            "year": "2024",
+            "authors": "Yitzhak Samir; Georgios Gadre; Vaishaal Smyrnis; Suchin Shankar; Mitchell Gururangan; Rulin Wortsman; Jean Shao; Alex Mercat; Jeffrey Fang; Sedrick Li;  Keh"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Scaling laws for discriminative speech recognition rescoring models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yile Gu; Prashanth Gurunath Shivakumar; Jari Kolehmainen; Ankur Gandhe; Ariya Rastrow; Ivan Bulyko"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Textually pretrained speech language models",
+            "journal": "Advances in Neural Information Processing Systems",
+            "year": "2023",
+            "authors": "Michael Hassid; Tal Remez; Anh Tu; Itai Nguyen; Alexis Gat; Felix Conneau; Jade Kreuk; Alexandre Copet; Gabriel Defossez; Emmanuel Synnaeve;  Dupoux"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Teaching large language models to reason with reinforcement learning",
+            "journal": "",
+            "year": "2024",
+            "authors": "Alex Havrilla; Yuqing Du; Sharath Chandra Raparthy; Christoforos Nalmpantis; Jane Dwivedi-Yu; Maksym Zhuravinskyi; Eric Hambro; Sainbayar Sukhbaatar; Roberta Raileanu"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Measuring coding challenge competence with APPS",
+            "journal": "",
+            "year": "2021",
+            "authors": "Dan Hendrycks; Steven Basart; Saurav Kadavath; Mantas Mazeika; Akul Arora; Ethan Guo; Collin Burns; Samir Puranik; Horace He; Dawn Song; Jacob Steinhardt"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Scaling laws for transfer",
+            "journal": "",
+            "year": "2021",
+            "authors": "Danny Hernandez; Jared Kaplan; Tom Henighan; Sam Mccandlish"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Distilling the knowledge in a neural network",
+            "journal": "",
+            "year": "2015",
+            "authors": "Geoffrey Hinton; Oriol Vinyals; Jeff Dean"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Training compute-optimal large language models",
+            "journal": "",
+            "year": "2022",
+            "authors": "Jordan Hoffmann; Sebastian Borgeaud; Arthur Mensch; Elena Buchatskaya; Trevor Cai; Eliza Rutherford; Diego De Las; Lisa Anne Casas; Johannes Hendricks; Aidan Welbl;  Clark"
+        },
+        {
+            "ref_id": "b20",
+            "title": "The curious case of neural text degeneration",
+            "journal": "",
+            "year": "2019",
+            "authors": "Ari Holtzman; Jan Buys; Li Du; Maxwell Forbes; Yejin Choi"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Scaling laws for neural language models",
+            "journal": "",
+            "year": "2020",
+            "authors": "Jared Kaplan; Sam Mccandlish; Tom Henighan; Tom B Brown; Benjamin Chess; Rewon Child; Scott Gray; Alec Radford; Jeffrey Wu; Dario Amodei"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Speculative decoding with big little decoder",
+            "journal": "Curran Associates, Inc",
+            "year": "2023",
+            "authors": "Sehoon Kim; Karttikeya Mangalam; Suhong Moon; Jitendra Malik; Michael W Mahoney; Amir Gholami; Kurt Keutzer"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Spoc: Search-based pseudocode to code",
+            "journal": "Curran Associates, Inc",
+            "year": "2019",
+            "authors": "Sumith Kulal; Panupong Pasupat; Kartik Chandra; Mina Lee; Oded Padon; Alex Aiken; Percy S Liang"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Fast inference from transformers via speculative decoding",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yaniv Leviathan; Matan Kalman; Yossi Matias"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Common 7B language models already possess strong math capabilities",
+            "journal": "",
+            "year": "2024",
+            "authors": "Chen Li; Weiqi Wang; Jingcheng Hu; Yixuan Wei; Nanning Zheng; Han Hu; Zheng Zhang; Houwen Peng"
+        },
+        {
+            "ref_id": "b26",
+            "title": "NLG evaluation using GPT-4 with better human alignment",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yang Liu; Dan Iter; Yichong Xu; Shuohang Wang; Ruochen Xu; Chenguang Zhu;  G-Eval"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Bigger is not always better: Scaling properties of latent diffusion models",
+            "journal": "",
+            "year": "2024",
+            "authors": "Kangfu Mei; Zhengzhong Tu; Mauricio Delbracio; Hossein Talebi; M Vishal; Peyman Patel;  Milanfar"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Lever: Learning to verify language-to-code generation with execution",
+            "journal": "PMLR",
+            "year": "2023",
+            "authors": "Ansong Ni; Srini Iyer; Dragomir Radev; Veselin Stoyanov; Wen-Tau Yih; Sida Wang; Xi Victoria; Lin "
+        },
+        {
+            "ref_id": "b29",
+            "title": "Transformers are multi-state RNNs",
+            "journal": "",
+            "year": "2024",
+            "authors": "Michael Matanel Oren; Yossi Hassid; Roy Adi;  Schwartz"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Large language models are effective text rankers with pairwise ranking prompting",
+            "journal": "",
+            "year": "2023",
+            "authors": "Zhen Qin; Rolf Jagerman; Kai Hui; Honglei Zhuang; Junru Wu; Jiaming Shen; Tianqi Liu; Jialu Liu; Donald Metzler; Xuanhui Wang; Michael Bendersky"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Scaling language models: Methods, analysis & insights from training gopher",
+            "journal": "",
+            "year": "2021",
+            "authors": "Sebastian Jack W Rae; Trevor Borgeaud; Katie Cai; Jordan Millican; Francis Hoffmann; John Song; Sarah Aslanides; Roman Henderson; Susannah Ring;  Young"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Code llama: Open foundation models for code",
+            "journal": "",
+            "year": "2023",
+            "authors": "Jonas Baptiste Roziere; Fabian Gehring; Sten Gloeckle; Itai Sootla;  Gat; Ellen Xiaoqing; Yossi Tan; Jingyu Adi; Tal Liu; Jérémy Remez;  Rapin"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Branch-solve-merge improves large language model evaluation and generation",
+            "journal": "",
+            "year": "2024",
+            "authors": "Swarnadeep Saha; Omer Levy; Asli Celikyilmaz; Mohit Bansal; Jason Weston; Xian Li"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Distilbert, a distilled version of bert: smaller, faster, cheaper and lighter",
+            "journal": "",
+            "year": "2019",
+            "authors": "Victor Sanh; Lysandre Debut; Julien Chaumond; Thomas Wolf"
+        },
+        {
+            "ref_id": "b35",
+            "title": "When do we not need larger vision models?",
+            "journal": "",
+            "year": "2024",
+            "authors": "Baifeng Shi; Ziyang Wu; Maolin Mao; Xin Wang; Trevor Darrell"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Natural language to code translation with execution",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022-12",
+            "authors": "Freda Shi; Daniel Fried; Marjan Ghazvininejad; Luke Zettlemoyer; Sida I Wang"
+        },
+        {
+            "ref_id": "b37",
+            "title": "Is ChatGPT good at search? investigating large language models as re-ranking agents",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023-12",
+            "authors": "Weiwei Sun; Lingyong Yan; Xinyu Ma; Shuaiqiang Wang; Pengjie Ren; Zhumin Chen; Dawei Yin; Zhaochun Ren"
+        },
+        {
+            "ref_id": "b38",
+            "title": "Gemini: a family of highly capable multimodal models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Gemini Team; Rohan Anil; Sebastian Borgeaud; Yonghui Wu; Jean-Baptiste Alayrac; Jiahui Yu; Radu Soricut; Johan Schalkwyk; Andrew M Dai; Anja Hauth"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Llama 2: Open foundation and fine-tuned chat models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Hugo Touvron; Louis Martin; Kevin Stone; Peter Albert; Amjad Almahairi; Yasmine Babaei; Nikolay Bashlykov; Soumya Batra; Prajjwal Bhargava; Shruti Bhosale"
+        },
+        {
+            "ref_id": "b40",
+            "title": "Efficient methods for natural language processing: A survey",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Marcos Treviso; Ji-Ung Lee; Tianchu Ji; Betty Van Aken; Qingqing Cao; Manuel R Ciosici; Michael Hassid; Kenneth Heafield; Sara Hooker; Colin Raffel; Pedro H Martins; F T André; Jessica Martins; Peter Zosa Forde; Edwin Milder; Noam Simpson; Jesse Slonim; Emma Dodge; Niranjan Strubell; Leon Balasubramanian; Iryna Derczynski; Roy Gurevych;  Schwartz"
+        },
+        {
+            "ref_id": "b41",
+            "title": "Solving math word problems with process-and outcome-based feedback",
+            "journal": "",
+            "year": "2022",
+            "authors": "Jonathan Uesato; Nate Kushman; Ramana Kumar; Francis Song; Noah Siegel; Lisa Wang; Antonia Creswell; Geoffrey Irving; Irina Higgins"
+        },
+        {
+            "ref_id": "b42",
+            "title": "Emergent abilities of large language models",
+            "journal": "Transactions on Machine Learning Research",
+            "year": "2022",
+            "authors": "Jason Wei; Yi Tay; Rishi Bommasani; Colin Raffel; Barret Zoph; Sebastian Borgeaud; Dani Yogatama; Maarten Bosma; Denny Zhou; Donald Metzler; Ed H Chi; Tatsunori Hashimoto; Oriol Vinyals; Percy Liang; Jeff Dean; William Fedus"
+        },
+        {
+            "ref_id": "b43",
+            "title": "calflops: a flops and params calculate tool for neural networks in pytorch framework",
+            "journal": "",
+            "year": "2023",
+            "authors": ""
+        },
+        {
+            "ref_id": "b44",
+            "title": "A survey on knowledge distillation of large language models",
+            "journal": "",
+            "year": "2024",
+            "authors": "Xiaohan Xu; Ming Li; Chongyang Tao; Tao Shen; Reynold Cheng; Jinyang Li; Can Xu; Dacheng Tao; Tianyi Zhou"
+        },
+        {
+            "ref_id": "b45",
+            "title": "Judging LLM-as-a-judge with MT-bench and chatbot arena",
+            "journal": "",
+            "year": "2023",
+            "authors": "Lianmin Zheng; Wei-Lin Chiang; Ying Sheng; Siyuan Zhuang; Zhanghao Wu; Yonghao Zhuang; Zi Lin; Zhuohan Li; Dacheng Li; Eric Xing"
+        },
+        {
+            "ref_id": "b46",
+            "title": "Pre-trained language model based ranking in baidu search",
+            "journal": "",
+            "year": "2021",
+            "authors": "Lixin Zou; Shengqiang Zhang; Hengyi Cai; Dehong Ma; Suqi Cheng; Shuaiqiang Wang; Daiting Shi; Zhicong Cheng; Dawei Yin"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 4 :4Figure 4: Code Llama performance vs. compute for the APPS benchmark, introductory split. The 13B model is superior to the 34B model and comparable to the 70B model under fixed budget. In contrast, the 7B model underperforms the larger models.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "56",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 5 :Figure 6 :56Figure 5: Code Llama performance vs. compute for the APPS benchmark, interview split.Similarly to the introductory split (Figure4), the 13B model is superior to the 34B model and comparable to the 70B model under fixed wall-time, while the 7B model is inferior to the larger models.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure7: A Python implementation of rank-score@k as presented in Equation (4).",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 99Figure 9: rank-score time @t as a function of wall-time for MBPP, using the LEVER verfier with different NLL rankers. Results are similar to Figure 8.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "(2022)  andNi et al. (2023) used execution feedback in order to filter code-generations, whileShi et al. (2022) used non-learned approaches,Ni et al. (2023) trained an external verifier on top of the generation and the execution feedback.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "figure",
+            "figure_id": "fig_7",
+            "figure_caption": "Figure 10 :10Figure10: Llama-3 performance vs. compute for the HumanEval benchmark. The 70B model performs better in general (Figure10a), but under a fixed compute budget (Figures10b and 10c), the 8B model substantially outperforms the larger one.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Code Llama FLOPS and wall-time usage per model size, along with normalized values with respect to the 7B model. utilization of the hardware. Specifically, we use a node of 8 A100 GPUs, optimize the batch size per model and measure the time it takes each model to generate a subset of ≈1k examples from our datasets. We report the Code Llama results in Table",
+            "figure_data": "Model Size FLOPs (Teras) FLOPs (norm.) wall-time (seconds) wall-time (norm.)7B1.691.003951.0013B3.291.956671.6934B8.585.082,9947.5870B17.6010.415,60514.19assuming optimal throughput"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Precise models' pass@k results for several k values over the HumanEval benchmark.",
+            "figure_data": "Modelk for pass@k1241664128256500 1000"
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "pass@k := E Problems 1 - ( n-c k ) ( n k ) ,(1)",
+            "formula_coordinates": [
+                3.0,
+                236.16,
+                177.89,
+                268.84,
+                29.47
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "k = max flops(k ′ )≤ f k ′ ,(2)",
+            "formula_coordinates": [
+                3.0,
+                342.27,
+                354.93,
+                162.73,
+                19.54
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "k = max time(k ′ )≤t k ′ ,(3)",
+            "formula_coordinates": [
+                3.0,
+                342.27,
+                378.43,
+                162.73,
+                19.54
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "rank-score@k := E Problems 1 ( n k ) • n-k+1 ∑ i=1 n -i k -1 • pass i , (4",
+            "formula_coordinates": [
+                7.0,
+                178.35,
+                319.97,
+                322.77,
+                28.82
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": ")",
+            "formula_coordinates": [
+                7.0,
+                501.13,
+                329.2,
+                3.87,
+                9.58
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "k = max flops(k ′ )≤ f k ′ , (5",
+            "formula_coordinates": [
+                7.0,
+                369.04,
+                430.55,
+                132.08,
+                19.54
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": ")",
+            "formula_coordinates": [
+                7.0,
+                501.12,
+                433.28,
+                3.87,
+                9.58
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "k = max time(k ′ )≤t k ′ , (6",
+            "formula_coordinates": [
+                7.0,
+                369.04,
+                454.05,
+                132.09,
+                19.54
+            ]
+        },
+        {
+            "formula_id": "formula_8",
+            "formula_text": ")",
+            "formula_coordinates": [
+                7.0,
+                501.12,
+                456.78,
+                3.87,
+                9.58
+            ]
+        },
+        {
+            "formula_id": "formula_9",
+            "formula_text": "score model = NLL model (G|P) = - 1 l l ∑ i=1 log p model (w i |w i-1 , . . . , w 1 , P) . (7",
+            "formula_coordinates": [
+                7.0,
+                152.5,
+                625.55,
+                348.62,
+                28.82
+            ]
+        },
+        {
+            "formula_id": "formula_10",
+            "formula_text": ")",
+            "formula_coordinates": [
+                7.0,
+                501.13,
+                634.78,
+                3.87,
+                9.58
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/2022.emnlp-main.231"
+}

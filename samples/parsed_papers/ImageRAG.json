@@ -1,0 +1,940 @@
+{
+    "title": "ImageRAG: Dynamic Image Retrieval for Reference-Guided Image Generation",
+    "caption": "A high-level overview of our ImageRAG",
+    "authors": "Rotem Shalev-Arkushin; Rinon Gal; Amit H Bermano; Ohad Fried",
+    "pub_date": "2025-02-13",
+    "abstract": "T2I (A) (B) (C) T2I Figure 1: Using references broadens the generation capabilities of image generation models. Given a text prompt, ImageRAG dynamically retrieves relevant images and provides them to a base text-to-image model (T2I). ImageRAG works with different models, such as SDXL (A) or OmniGen (B, C), and different controls, e.g. text (A, B) or personalization (C).",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": "Diffusion models (Ho et al., 2020) have recently revolutionized image generation, offering high-quality, diverse, and realistic visual content (Dhariwal & Nichol, 2021;Rombach et al., 2022). They enable text-to-image generation as well as a wide range of tasks, from layout-based synthesis to image editing and style transfer (Avrahami et al., 2022;Hertz et al., 2022;Mokady et al., 2023;Avrahami et al., 2023b;Zhang et al., 2023;Brooks et al., 2023;Nitzan et al., 2024). Of course, these large models require great amounts of training data, substantial training durations, and extensive computational resources. As a result, contemporary text-to-image (T2I) models, that are limited to the data they were trained on, struggle with generating user-specific concepts or updated content. Additionally, they have difficulty with generating rare concepts, stylized content, or fine-grained categories (e.g., a specific dog breed), even if they were trained on images containing them (Samuel et al., 2024b;Haviv et al., 2024). In these cases, diffusion models tend to \"hallucinate\", and potentially generate content unrelated to the textual prompt (see Figure 2). To tackle these problems, several approaches have been proposed for personalized (Gal et al., 2023a;Ruiz et al., 2023;Voynov et al., 2023;Arar et al., 2024), stylized (Hu et al., 2021), or rare concept generation (Li et al., 2024;Samuel et al., 2024b).",
+            "publication_ref": [
+                "b22",
+                "b13",
+                "b45",
+                "b3",
+                "b21",
+                "b33",
+                "b67",
+                "b8",
+                "b37",
+                "b20",
+                "b46",
+                "b56",
+                "b2",
+                "b23",
+                "b31"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Model output +Reference ImageRAG",
+            "text": "Cradle (SDXL) Chime (OmniGen)\nFigure 2: Hallucinations. When models do not know the meaning of a prompt, they may \"hallucinate\" and generate unrelated images (left). By applying our method to retrieve and utilize relevant references (mid), the base models can generate appropriate images (right).\nMost approaches, however, require training or specialized optimization techniques for each new concept.\nWe note that similar problems exist with text generation using Large Language Models (LLMs). LLMs struggle to generate text based on real-world facts, proprietary or updated data, and tend to hallucinate when lacking sufficient knowledge (Brown, 2020;Ji et al., 2023). To solve these problems, the Natural Language Processing community has adopted Retrieval Augmented Generation (RAG) (Lewis et al., 2020). RAG is a method for dynamically retrieving the most relevant information to a given task from external sources and supplying it to an LLM as context input, enabling it to generate contextually accurate and task-specific responses. Investigating this idea for images, we notice previous works employing image retrieval for better image generation (Chen et al., 2022;Sheynin et al., 2022;Blattmann et al., 2022;Hu et al., 2024), are based on models trained specifically for the task, hindering wide applicability.\nIn contrast, we propose ImageRAG, a method that dynamically retrieves and provides images as references to pretrained T2I models, to enhance their generation capabilities. Our method does not require additional training over the retrieved content or specifically for RAG. Instead, we use T2I models in the same vein as the common use of LLMs, and use reference images during sampling for guided generation. Compared to the language case, in the visual domain, the context is more limited. Hence, we cannot simply provide references for all the concepts in a prompt. We note that to apply RAG for image generation, we need to answer the questions of which images to use as context, how to retrieve them, and how to use the retrieved images to successfully generate a required concept. In this work, we address these questions by offering a novel method that dynamically chooses the most relevant and useful examples given a prompt, and uses them as references, to guide the model toward generating the required results. Leveraging T2I models' ability to produce many concepts, we only pass concepts the models struggle to generate, focusing on the gaps. To understand what the challenging concepts are, we suggest a novel method that dynamically chooses images to retrieve for a given prompt using a step-by-step method and a Vision-Language Model (VLM). Specifically, we ask the VLM to identify missing image components and suggest concepts that could be retrieved, and use them as references to guide the generation.\nOur approach is not related to a specific T2I model. To demonstrate it, we apply ImageRAG to two model types: T2I models designed to allow in-context learning (ICL) (Brown, 2020); and T2I models augmented with an IP-adapter imageencoder (Ye et al., 2023) that allows image prompting. In ICL, the generative model is provided with a set of taskspecific examples in the prompt (as context input) and is expected to perform a similar task on a new input. ICL does not require additional training or large amounts of data, and offers a way to adapt the model to new tasks or domains by supplying it with unseen information at inference time. IP-adapters are image-encoders that allow prompting a T2I model with images, as adapters for existing models. Both types show great potential for improved image generation, with impressive results (Ye et al., 2023;Xiao et al., 2024;Gu et al., 2024;Wang et al., 2023;Najdenkoska et al., 2024;Sun et al., 2024). We demonstrate the effectiveness of our method for image generation of rare and fine-grained concepts on two models, representing the two model types:\nOmnigen (Xiao et al., 2024) -a model that was designed to allow ICL; and SDXL (Podell et al., 2024)+IP-adapter (Ye et al., 2023) -models that allow image prompting through the IP-adapter image-encoder. We perform quantitative and qualitative comparisons on both models, and show that RAG enhances their rare and fine-grained concept generation capabilities. These results indicate that the image generation community should also consider using RAG for class or task-specific generation during sampling time.",
+            "publication_ref": [
+                "b9",
+                "b26",
+                "b30",
+                "b11",
+                "b50",
+                "b7",
+                "b24",
+                "b9",
+                "b63",
+                "b63",
+                "b62",
+                "b19",
+                "b59",
+                "b34",
+                "b53",
+                "b62",
+                "b40",
+                "b63"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "In-Context Learning",
+            "text": "In-context learning (ICL) has emerged as a powerful paradigm in which large language models (LLMs) are capable of performing new tasks without additional fine-tuning (Brown, 2020). By providing a few examples or relevant context directly in the input prompt, ICL enables models to infer the desired task and generate appropriate outputs. Despite its flexibility, ICL is limited by the finite context window of the model, making the selection of relevant and concise context critical for optimal performance. ImageRAG",
+            "publication_ref": [
+                "b9"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Visual In-Context Learning",
+            "text": "Recently, visual ICL presented promising results (Gu et al., 2024;Wang et al., 2023;Xiao et al., 2024;Najdenkoska et al., 2024;Sun et al., 2024). Visual ICL has mostly been explored in the context of learning from analogies (Gu et al., 2024;Wang et al., 2023;Xiao et al., 2024;Nguyen et al., 2024). However, the ability of learning from single examples has also been researched with multimodal generative models that allow images as input (Xiao et al., 2024;Sun et al., 2024;Wang et al.). Such models, which allow image prompting, facilitate exploring RAG for image generation.",
+            "publication_ref": [
+                "b19",
+                "b59",
+                "b62",
+                "b34",
+                "b53",
+                "b19",
+                "b59",
+                "b62",
+                "b35",
+                "b62",
+                "b53"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Retrieval Augmented Generation (RAG)",
+            "text": "RAG (Lewis et al., 2020) is a method to improve the generation abilities of a pretrained model without additional training, by dynamically retrieving and supplying information as context in the prompt. The most relevant information for a given query is retrieved from an external database, and supplied to the model as context for improved generation that relies on the context data. While RAG has been greatly explored for text generation tasks and applied over multiple pretrained LLMs (Lewis et al., 2020;Gao et al., 2023;Ram et al., 2023;Zhang et al., 2025), it has yet to be explored for enhancing the capabilities of pretrained text-to-image models. Some previous work used nearest-neighbor image retrieval to improve image generation (Sheynin et al., 2022;Blattmann et al., 2022;Chen et al., 2022;Hu et al., 2024), however they train models specifically for retrieval-aided generation. Unlike them, our method leverages pretrained models and does not require additional training.",
+            "publication_ref": [
+                "b30",
+                "b30",
+                "b17",
+                "b42",
+                "b66",
+                "b50",
+                "b7",
+                "b11",
+                "b24"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Text-to-Image Generation",
+            "text": "Text-to-image generation advanced greatly with the introduction of diffusion models (Ho et al., 2020), which can produce high-quality and diverse images of a wide range of concepts (Dhariwal & Nichol, 2021;Rombach et al., 2022;Podell et al., 2024;Xiao et al., 2024). However, they still struggle with rare concepts and cannot generate user-specific concepts without additional training or optimization.\nPersonalization works generate images of a user-specific concept. However, they often require an optimization process for learning each new concept (Nitzan et al., 2022;Gal et al., 2023a;Ruiz et al., 2023;Arar et al., 2024;Alaluf et al., 2023;Voynov et al., 2023;Avrahami et al., 2023a;Kumari et al., 2023). To mitigate this challenge, recent works train image-encoders that allow prompting existing pretrained generative models with images (Ye et al., 2023;Gal et al., 2023b;Wei et al., 2023;Shi et al., 2024;Gal et al., 2024;Patashnik et al., 2025).\nRare Concept Generation works that explored generating rare concepts without image retrieval, used a few examples of each rare concept to optimize seeds that produce images similar to the references (Samuel et al., 2024a;b). However, in addition to the requirement of an optimization process per new concept, these works also do not address the questions of how to choose or find the reference images.",
+            "publication_ref": [
+                "b22",
+                "b13",
+                "b45",
+                "b40",
+                "b62",
+                "b36",
+                "b46",
+                "b2",
+                "b1",
+                "b56",
+                "b28",
+                "b63",
+                "b61",
+                "b51",
+                "b39",
+                "b9"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Method",
+            "text": "Our goal is to increase the robustness of T2I models, particularly with rare or unseen concepts, which they struggle to generate. To do so, we investigate a retrieval-augmented generation approach, through which we dynamically select images that can provide the model with missing visual cues. Importantly, we focus on models that were not trained for RAG, and show that existing image conditioning tools can be leveraged to support RAG post-hoc. As depicted in Fig. 3, given a text prompt and a T2I generative model, we start by generating an image with the given prompt. Then, we query a VLM with the image, and ask it to decide if the image matches the prompt. If it does not, we aim to retrieve images representing the concepts that are missing from the image, and provide them as additional context to the model to guide it toward better alignment with the prompt. In the following sections, we describe our method by answering key questions: (1) How do we know which images to retrieve? (2) How can we retrieve the required images? and (3) How can we use the retrieved images for unknown concept generation? By answering these questions, we achieve our goal of generating new concepts that the model struggles to generate on its own.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Which images to retrieve?",
+            "text": "The amount of images we can pass to a model is limited, hence we need to decide which images to pass as references to guide the generation of a base model. As T2I models are already capable of generating many concepts successfully, an efficient strategy would be passing only concepts they struggle to generate as references, and not all the concepts in a prompt. To find the challenging concepts, we utilize a VLM and apply a step-by-step method, as depicted in the bottom part of Fig. 3. First, we generate an initial image with a T2I model. Then, we provide the VLM with the initial prompt and image, and ask it if they match. If not, we ask the VLM to identify missing concepts and focus on content and style, since these are easy to convey through visual cues.\nAs demonstrated in Tab. 3, empirical experiments show that image retrieval from detailed image captions yields better results than retrieval from brief, generic concept descriptions. Therefore, after identifying the missing concepts, we ask the VLM to suggest detailed image captions for images that describe each of the concepts.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "ERROR HANDLING",
+            "text": "The VLM may sometimes fail to identify the missing concepts in an image, and will respond that it is \"unable to Given a text prompt <p>, we generate an initial image using a text-to-image (T2I) model. Then, we generate retrieval-captions <c j >, retrieve images from an external database for each caption <i j >, and use them as references to the model for better generation. Bottom: the retrieval-caption generation block.\nWe use a VLM to decide if the initial image matches the given prompt. If not, we ask it to list the missing concepts, and to create a caption that could be used to retrieve appropriate examples for each of these missing concepts.\nrespond\". In these rare cases, we allow up to 3 query repetitions, while increasing the query temperature in each repetition. Increasing the temperature allows for more diverse responses by encouraging the model to sample less probable words. In most cases, using our suggested stepby-step method yields better results than retrieving images directly from the given prompt (see Sec. 5.3). However, if the VLM still fails to identify the missing concepts after multiple attempts, we fall back to retrieving images directly from the prompt, as it usually means the VLM does not know what is the meaning of the prompt.\nThe used prompts can be found in Appendix A. Next, we turn to retrieve images based on the acquired image captions.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "How to retrieve the required images?",
+            "text": "Given n image captions, our goal is to retrieve the images that are most similar to these captions from a dataset. To retrieve images matching a given image caption, we compare the caption to all the images in the dataset using a text-image similarity metric and retrieve the top k most similar images. Text-to-image retrieval is an active research field (Radford et al., 2021;Zhai et al., 2023;Ray et al., 2024;Vendrow et al., 2024), where no single method is perfect. Retrieval is especially hard when the dataset does not contain an exact match to the query (Biswas & Ramnath, 2024) or when the task is fine-grained retrieval, that depends on subtle details (Wei et al., 2022). Hence, a common retrieval workflow is to first retrieve image candidates using pre-computed embeddings, and then re-rank the retrieved candidates using a different, often more expensive but accurate, method (Vendrow et al., 2024). Following this workflow, we experimented with cosine similarity over different embeddings, and with multiple re-ranking methods of reference candidates. Although re-ranking sometimes yields better results compared to simply using cosine similarity between CLIP (Radford et al., 2021) embeddings, the difference was not significant in most of our experiments. Therefore, for simplicity, we use cosine similarity between CLIP embeddings as our similarity metric (see Tab. 4, Sec. 5.3 for more details about our experiments with different similarity metrics).",
+            "publication_ref": [
+                "b41",
+                "b64",
+                "b43",
+                "b55",
+                "b6",
+                "b60",
+                "b55",
+                "b41"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "How to use the retrieved images?",
+            "text": "Putting it all together, after retrieving relevant images, all that is left to do is to use them as context so they are beneficial for the model. We experimented with two types of models; models that are trained to receive images as input in addition to text and have ICL capabilities (e.g., OmniGen (Xiao et \nfor i ∈ [1, n] is a com- patible image caption of the image <img i,j >, j ∈ [1, k].\nThis prompt allows models to learn missing concepts from the images, guiding them to generate the required result.\nPersonalized Generation: For models that support multiple input images, we can apply our method for personalized generation as well, to generate rare concept combinations with personal concepts. In this case, we use one image for personal content, and 1+ other reference images for missing concepts. For example, given an image of a specific cat, we can generate diverse images of it, ranging from a mug featuring the cat to a lego of it or atypical situations like the cat writing code or teaching a classroom of dogs (Fig. 4).\n\"<p> My cat is the cat in this image: \"\n\"My cat in a classroom teaching dogs.\"\nImageRAG OmniGen \"My cat on a mug.\" \"My cat on a cat food commercial.\"\n\"A lego of my cat on a kids room.\"\n\"My cat writing code in a computer.\" ",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Implementation Details",
+            "text": "We use a subset of LAION (Schuhmann et al., 2022) containing 350K images as the dataset from which we retrieve images. As a retrieval similarity metric, we use CLIP \"ViT-B/32\". For a VLM we use GPT-4o-2024-08-06 (Hurst et al., 2024) with a temperature of 0 for higher consistency (unless GPT fails to find concepts, see Sec. 3.1.1). Full GPT prompts are supplied in Appendix A. As our T2I generation base models we use SDXL (Podell et al., 2024) with the ViT-H IP-adapter (Ye et al., 2023) plus version (\"ip-adapterplus sdxl vit-h\"), using 0.5 for the ip adapter scale, and OmniGen (Xiao et al., 2024) with the default parameters (2.5 guidance scale, 1.6 image guidance scale, and a resolution of 1024x1024). As OmniGen only supports 3 images as context, we use up to k = 3 concepts for each prompt and n = 1 images per concept. For SDXL, as the IP-adapter we used is limited to 1 image, we use 1 concept and 1 image.",
+            "publication_ref": [
+                "b49",
+                "b25",
+                "b40",
+                "b63",
+                "b62"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments",
+            "text": "In this section, we describe quantitative and qualitative experiments performed to evaluate the effectiveness of our method. To assess its adaptability to different model types, we experiment with applying ImageRAG to two models, namely OmniGen (Xiao et al., 2024) and SDXL (Podell et al., 2024), each representing a different model type.",
+            "publication_ref": [
+                "b62",
+                "b40"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Quantitative comparisons",
+            "text": "We evaluate the ability of our method to improve T2I generation of rare and fine-grained concepts by comparing the results of OmniGen and SDXL with their results when applying ImageRAG to them. As additional baselines, we compare with FLUX (Labs, 2023), Pixart-Σ (Chen et al., 2025), and GraPE (Goswami et al., 2024). The last is an iterative LLM-based image generation method which employs editing tools to insert missing objects. We use their OmniGenbased version. We use each method to generate images of each class in the following datasets: ImageNet (Deng et al., 2009), iNaturalist (Van Horn et al., 2018), CUB (Wah et al., 2011), and Aircraft (Maji et al., 2013). For iNaturalist, we use the first 1000 classes. Tab. 1 shows evaluation results of all methods using CLIP (Radford et al., 2021), SigLIP (Zhai et al., 2023) and DINO (Zhang et al.) similarities. For fairness, we use open-CLIP for evaluation, while using OpenAI CLIP for retrieval. As demonstrated in Tab. 1, both Omni-Gen and SDXL results improve when using our method for the generation of rare concepts and fine-grained categories.",
+            "publication_ref": [
+                "b29",
+                "b18",
+                "b12",
+                "b54",
+                "b57",
+                "b32",
+                "b41",
+                "b64"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Proprietary Data Generation",
+            "text": "A common use for RAG in NLP is generation based on proprietary data (Lewis et al., 2020), where the retrieval dataset is a proprietary one. A similar application in image generation would be generating images based on a proprietary gallery of images. It could be for personalization, where the gallery is of a personal concept, e.g. images of a person's dog, or it could be a company brand or a private collection of images that could broaden the knowledge of a model. Our LAION-based experiments explored the scenario where a user has access to a general, large-scale set. Here, we further evaluate the performance of ImageRAG when we have access to a potentially smaller, specialized dataset. Hence, we repeat the experiments with the datasets used in Tab. 1, but this time retrieve samples from within each dataset rather than from the LAION (Schuhmann et al., 2022) subset. Results are reported in Tabs. 2 and 5. We observe that although applying our method with the generic dataset of a relatively small subset from LAION already improves the results, they improve even further when using the proprietary datasets for retrieval.\nTable 1: Comparisons on fine-grained image generation with text-to-image models. We use the ImageNet (Deng et al., 2009), iNaturalist (Van Horn et al., 2018), CUB (Wah et al., 2011), and Aircraft (Maji et al., 2013) datasets. For each set, we report mean (± standard error) CLIP, SigLIP text-to-image similarities, and DINO similarity between real and generated images. Middle rows feature OmniGen-based models, while the bottom features SDXL-based models. In each part, best results are bolded.\nImageNet iNaturalist CUB Aircraft CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑\nFLUX 0.262 ± 0.001 0.132 ± 0.001 0.711 ± 0.003 0.201 ± 0.002 0.048 ± 0.002 0.644 ± 0.002 0.254 ± 0.004 0.126 ± 0.003 0.759 ± 0.004 0.243 ± 0.007 0.116 ± 0.006 0.725 ± 0.011 Pixart-Σ 0.262 ± 0.001 0.121 ± 0.001 0.691 ± 0.003 0.162 ± 0.002 0.027 ± 0.002 0.611 ± 0.002 0.232 ± 0.004 0.101 ± 0.003 0.736 ± 0.004 0.160 ± 0.008 0.054 ± 0.006 0.634 ± 0.011 OmniGen 0.247 ± 0.002 0.122 ± 0.001 0.692 ± 0.003 0.155 ± 0.002 0.014 ± 0.001 0.595 ± 0.002 0.231 ± 0.005 0.109 ± 0.003 0.747 ± 0.005 0.181 ± 0.010 0.073 ± 0.007 0.656 ± 0.013 GraPE-O 0.251 ± 0.002 0.123 ± 0.001 0.692 ± 0.003 0.157 ± 0.002 0.016 ± 0.002 0.604 ± 0.001 0.240 ± 0.005 0.115 ± 0.003 0.747 ± 0.005 0.191 ± 0.009 0.073 ± 0.007 0.647 ± 0.013 ImageRAG-O 0.264 ± 0.001 0.134 ± 0.001 0.708 ± 0.002 0.197 ± 0.002 0.095 ± 0.002 0.701 ± 0.002 0.253 ± 0.003 0.125 ± 0.002 0.760 ± 0.003 0.228 ± 0.006 0.103 ± 0.005 0.747 ± 0.010 SDXL 0.267 ± 0.002 0.136 ± 0.001 0.700 ± 0.003 0.259 ± 0.002 0.096 ± 0.002 0.698 ± 0.003 0.315 ± 0.001 0.172 ± 0.003 0.782 ± 0.002 0.264 ± 0.006 0.145 ± 0.005 0.771 ± 0.010 ImageRAG-SD 0.274 ± 0.001 0.141 ± 0.001 0.709 ± 0.002 0.243 ± 0.002 0.118 ± 0.001 0.724 ± 0.002 0.314 ± 0.001 0.174 ± 0.002 0.784 ± 0.001 0.272 ± 0.005 0.141 ± 0.005 0.756 ± 0.011 Table 2: Proprietary data usage experiment. Results for using each dataset as the retrieval-dataset (\"Proprietary-<model>\") vs. using our subset from LAION as the retrieval-dataset (\"LAION-<model>\"). Here, \"O\" indicates OmniGen based models, \"SD\" indicates SDXL based models. Best results for each model are bolded.\nImageNet Aircraft CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑\nLAION-O 0.264 ± 0.001 0.134 ± 0.001 0.708 ± 0.002 0.228 ± 0.006 0.103 ± 0.005 0.747 ± 0.010 Proprietary-O 0.266 ± 0.001 0.136 ± 0.001 0.710 ± 0.002 0.244 ± 0.007 0.109 ± 0.005 0.786 ± 0.010 LAION-SD 0.274 ± 0.001 0.141 ± 0.001 0.709 ± 0.002 0.272 ± 0.005 0.141 ± 0.005 0.756 ± 0.011 Proprietary-SD 0.288 ± 0.001 0.142 ± 0.001 0.736 ± 0.003 0.280 ± 0.005 0.152 ± 0.003 0.785 ± 0.009 Table 3: Ablation studies. \"Rephrased prompt\" stands for only rephrasing the text prompt without giving additional images. \"Retrieve concepts\" stands for using the missing concepts directly instead of using more detailed image captions for retrieval, and \"Retrieve prompt\" stands for using the prompt directly for retrieval. Best results are bolded.\nImageNet CUB CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑\nOmniGen 0.247 ± 0.002 0.122 ± 0.001 0.692 ± 0.003 0.231 ± 0.005 0.109 ± 0.003 0.747 ± 0.005 Rephrased prompt-O 0.248 ± 0.002 0.124 ± 0.042 0.696 ± 0.003 0.230 ± 0.005 0.107 ± 0.004 0.750 ± 0.005 Retrieve concepts-O 0.258 ± 0.002 0.130 ± 0.001 0.694 ± 0.003 0.240 ± 0.004 0.113 ± 0.003 0.719 ± 0.006 Retrieve prompt-O 0.258 ± 0.002 0.130 ± 0.001 0.691 ± 0.003 0.246 ± 0.004 0.120 ± 0.003 0.736 ± 0.005 ImageRAG-O 0.264 ± 0.001 0.134 ± 0.001 0.708 ± 0.002 0.253 ± 0.003 0.125 ± 0.002 0.760 ± 0.003 SDXL 0.267 ± 0.002 0.136 ± 0.001 0.700 ± 0.003 0.315 ± 0.001 0.172 ± 0.003 0.782 ± 0.002 Rephrased prompt-SD 0.266 ± 0.002 0.136 ± 0.001 0.705 ± 0.003 0.309 ± 0.003 0.170 ± 0.002 0.781 ± 0.004 Retrieve concepts-SD 0.274 ± 0.001 0.141 ± 0.001 0.702 ± 0.003 0.312 ± 0.002 0.173 ± 0.002 0.777 ± 0.004 Retrieve prompt-SD 0.274 ± 0.001 0.140 ± 0.001 0.702 ± 0.003 0.314 ± 0.001 0.174 ± 0.001 0.778 ± 0.004 ImageRAG-SD 0.274 ± 0.001 0.141 ± 0.001 0.709 ± 0.002 0.314 ± 0.001 0.174 ± 0.002 0.784 ± 0.001",
+            "publication_ref": [
+                "b30",
+                "b49",
+                "b12",
+                "b54",
+                "b57",
+                "b32"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ablation Studies",
+            "text": "To evaluate the contribution of each part of our method, we conduct an ablation study testing different components and report our results in Tab. 3. First, we want to ensure the performance gap is not based on simply interpreting rare words using an LLM. Hence, we evaluate OmniGen and SDXL over rephrased text prompts, without providing reference images. To do so, we asked GPT to rephrase the prompts, to make them easier for a T2I generative model, by explicitly asking it to change rare words to their description if necessary. The full prompt can be found in Appendix A. As the results show, rephrasing was not enough for a meaningful improvement in the results (\"Rephrased prompt\" in Tab. 3). Next, we investigate the importance of using detailed image captions for retrieval, rather than just listing the missing concepts or using the original prompt. We do so by evaluating our method when retrieving the concepts directly without generating compatible image captions for each missing concept (\"Retrieve concepts\" in Tab. 3), and when retrieving the prompt directly (\"Retrieve prompt\" in Tab. 3). While retrieval with each of them introduced some improvement over the initial results, retrieving detailed captions improved the results even further. Even relatively small, unspecialized retrieval sets can already improve results. More data leads to further increased scores. However, small sets may not contain relevant retrieval examples, and their use may harm results, particularly for stronger models.\nNext, we investigate the effect of the retrieval-dataset size. We tested our method over ImageNet (Deng et al., 2009) and Aircraft (Maji et al., 2013) when using 1000, 10,000, 100,000, and 350,000 examples from LAION (Schuhmann et al., 2022). Fig. 5 shows that increasing the dataset size typically leads to better results. However, even using a relatively small dataset can already lead to improvements. For OmniGen, 1000 examples were enough to see an improvement over the baseline model. SDXL has a stronger baseline, hence more examples were needed for improvement.\nFinally, we investigate the effect of different similarity metrics for retrieval. We used CLIP (Radford et al., 2021), Table 4: Similarity metric ablation study (OmniGen). Results of our method using different similarity metrics for image retrieval. Best results are bolded.\nImageNet CUB CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑\nGPT Re-rank 0.265 ± 0.001 0.135 ± 0.001 0.707 ± 0.002 0.255 ± 0.004 0.125 ± 0.003 0.762 ± 0.004 BM25 Re-rank 0.264 ± 0.001 0.134 ± 0.001 0.707 ± 0.002 0.253 ± 0.003 0.123 ± 0.003 0.763 ± 0.004 SigLIP 0.259 ± 0.006 0.133 ± 0.001 0.704 ± 0.002 0.243 ± 0.004 0.116 ± 0.003 0.761 ± 0.004 CLIP 0.264 ± 0.001 0.134 ± 0.001 0.708 ± 0.002 0.253 ± 0.003 0.125 ± 0.002 0.760 ± 0.003\nSigLIP (Zhai et al., 2023), and re-ranking with GPT (Hurst et al., 2024) and BM25 (Robertson et al., 2009) over image captions generated by GPT for the retrieved candidates. Reranking was performed after retrieving 3 candidates from each of CLIP and SigLIP. Results are reported in Tab. 4.\nAlthough re-ranking with GPT produced slightly better results, they were not significant enough to justify the cost of applying this complex strategy vs. a more straightforward CLIP metric. Hence, our other experiments use CLIP. Nevertheless, all the different metrics improved the generation abilities of the base model by providing helpful references.   et al., 2009), CUB (Wah et al., 2011) and iNaturalist (Van Horn et al., 2018) datasets, comparing the results of OmniGen and SDXL with and without our method.",
+            "publication_ref": [
+                "b12",
+                "b32",
+                "b49",
+                "b41",
+                "b64",
+                "b25",
+                "b44",
+                "b57",
+                "b54"
+            ],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Qualitative comparisons",
+            "text": "To further assess the quality of our results, we conduct a user study with 46 participants and a total of 767 comparisons. We perform two types of studies -one that evaluates SDXL and OmniGen with and without our method, and another that compares our results with other retrieval-based generation models. Specifically, we compare to models explicitly trained for the task of image generation using retrieved images: RDM (Blattmann et al., 2022), knn-diffusion (Sheynin et al., 2022), and ReImagen (Chen et al., 2022). Since these are largely proprietary models with no API, we compare to images and prompts published in their papers.\nIn both cases, we ask participants to compare two images at a time: one created with our approach, and one using a baseline. We ask users to choose the one they prefer in terms of adherence to the text prompt, visual quality, and overall preference. Since some prompts contain uncommon concepts, we supply users with a real image of the least familiar concept in each prompt (not taken from our dataset). When running ImageRAG for the user study, we disable the decision step where GPT is asked if the initial image matches the prompt. This is done to avoid showing a user the same image twice in cases where GPT deems the initial image to be a good fit. As demonstrated in Fig. 6 participants favored ImageRAG over all other methods in all three criteria of text alignment, visual quality, and overall preference. Appendix C supplies more information about questions asked in the study, visual comparison examples for each retrievalbased generation model (Fig. 8), and more comparisons to SDXL (Fig. 9) and OmniGen (Fig. 10) with and without ImageRAG. Fig. 11 shows additional visual results of our method with more complex and creative prompts.",
+            "publication_ref": [
+                "b7",
+                "b50",
+                "b11"
+            ],
+            "figure_ref": [
+                "fig_7"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": "Although our method can help models generate concepts they are unable of generating alone, it has some limitations, depending on the data, retrieval method, and underlying model. For example, both OmniGen and SDXL struggle with text, and even when given a text image as a reference, they do not learn from it accurately. Moreover, our results depend on the quality of the retrieval method. For example, when using CLIP for retrieval, we cannot help with tasks it does not excel, such as counting (Paiss et al., 2023). Additionally, we rely on the used VLM to decide whether we should apply our method or not. Although GPT is a powerful model and often answers correctly if an image matches a text prompt, sometimes it may answer that the prompt aligns with the image even if it does not, and in these cases our method will not be applied. A possible solution is to apply our method directly if the output image is not satisfactory. Finally, our ability to aid the model also depends on the dataset we retrieve images from. If the dataset only contains images of birds and the task is to generate a specific dog breed, we will not be able to help. On the other hand, as presented in Tab. 2, if the retrieval dataset contains relevant information, the generation will also be more accurate.",
+            "publication_ref": [
+                "b38"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": "In this work, we explore how to apply RAG over pretrained text-to-image models, using a simple yet effective method. We show that using relevant image references improves T2I models abilities to generate rare concepts and demonstrate how we can dynamically retrieve relevant references with a simple approach utilizing a VLM. We experiment with  (Deng et al., 2009), CUB (Wah et al., 2011) andiNaturalist (Van Horn et al., 2018). The left-most image column is the retrieved reference using ImageRAG for each prompt. OmniGen and SDXL both struggle with the uncommon concepts, sometimes generating similar concepts such as a bull or a cow instead of the dog breed \"Boston bull\", while in other times, they generate completely unrelated images, as in the case of \"Chow\", or \"Geococcyx\". When using ImageRAG both models generate the correct concept.\ntwo models representing two model types and show how our method can be applied to multiple different models. We conclude that using image references broadens the applicability of text-to-image generation models, requiring minimal modifications to enhance generation possibilities.",
+            "publication_ref": [
+                "b12",
+                "b57"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethical statement",
+            "text": "The development of ImageRAG introduces enhancement possibilities for image generation models, enabling rare or fine-grained concept generation. While these advancements hold promise for creative industries, personalized content creation, and scientific visualization, they also raise ethical concerns, including potential misuse for harmful content such as deepfakes and the use of private data. Therefore, transparency in data usage and adherence to privacy regulations are essential. We condemn any misuse of the proposed technology, and actively research tools to identify and prevent malicious usage of generative models (Agarwal et al., 2020;Knafo, 2022;Sinitsa & Fried, 2024).",
+            "publication_ref": [
+                "b0",
+                "b52"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A. Retrieval-Caption Generation Prompts",
+            "text": "Full prompts used for querying GPT in the retrieval-caption generation part of our method:\nDecision: 'Does this image match the prompt \"{prompt}\"? Consider both content and style aspects. Only answer yes or no.'\nMissing Concepts Identification: 'What are the differences between this image and the required prompt? In your answer only provide missing concepts in terms of content and style, each in a separate line. For example, if the prompt is \"An oil painting of a sheep and a car\" and the image is a painting of a car but not an oil painting, the missing concepts will be: oil painting style a sheep'\nCaption Generation: 'For each concept you suggested above, please suggest an image caption describing an image that explains this concept only. The captions should be standalone description of the images, assuming no knowledge of the given images and prompt, that I can use to lookup images with automatically. In your answer only provide the image captions, each in a new line with nothing else other than the caption.'\nRephrase request prompt: prompt used for the rephrasing ablation experiment: 'Please rephrase the following prompt to make it easier and clearer for the text-to-image generation model that generated the above image for this prompt. The goal is to generate an image that matches the given text prompt. If the prompt is already clear, return it as it is. Simplify and shorten long descriptions of known objects/entities but DO NOT change the original meaning of the text prompt.\nIf the prompt contains rare words, change those words to a description of their meaning. In your answer only provide the prompt and nothing else. The prompt to be rephrased: \"{prompt}\".'",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B. Additional Experiments",
+            "text": "Additional proprietary dataset experiments over the CUB (Wah et al., 2011) and iNaturalist (Van Horn et al., ",
+            "publication_ref": [
+                "b57"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C. User Study Questions",
+            "text": "In the user study, we asked users to compare pairs of images at a time, by asking which one adheres better to the prompt and has better visual quality. We supplied real references (not from our dataset) for rare concepts with each pair. The questions we asked were: For each criteria, choose the better image out of A and B given the following text prompt: <prompt>. The less familiar concept \"<rare concept>\" is presented on the left of the image options.  \"Rusty fire hydrant is close to the edge of the curb and painted green.\"\nFigure 8: Comparisons between ImageRAG and different methods using retrieval for generation. Prompts and results of all other methods are taken from their papers. The methods we compared to are RDM (Blattmann et al., 2022), Re-Imagen (Chen et al., 2022), and KNN-Diffusion (Sheynin et al., 2022).  ",
+            "publication_ref": [
+                "b7",
+                "b11",
+                "b50"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgments",
+            "text": "We thank Gal Chechik and Daniel Arkushin for helpful discussions. This research was partially funded by ISF grant numbers 1337/22, 1574/21.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Detecting deep-fake videos from phoneme-viseme mismatches",
+            "journal": "",
+            "year": "2020",
+            "authors": "S Agarwal; H Farid; O Fried; M Agrawala"
+        },
+        {
+            "ref_id": "b1",
+            "title": "A neural space-time representation for text-to-image personalization",
+            "journal": "ACM Transactions on Graphics (TOG)",
+            "year": "2023",
+            "authors": "Y Alaluf; E Richardson; G Metzer; D Cohen-Or"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Prompt aligned personalization of text-to-image models",
+            "journal": "",
+            "year": "2024",
+            "authors": "M Arar; A Voynov; A Hertz; O Avrahami; S Fruchter; Y Pritch; D Cohen-Or; A Shamir;  Palp"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Blended diffusion for text-driven editing of natural images",
+            "journal": "",
+            "year": "2022",
+            "authors": "O Avrahami; D Lischinski; O Fried"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Break-a-scene: Extracting multiple concepts from a single image",
+            "journal": "",
+            "year": "2023",
+            "authors": "O Avrahami; K Aberman; O Fried; D Cohen-Or; D Lischinski"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Spatext: Spatio-textual representation for controllable image generation",
+            "journal": "",
+            "year": "2023",
+            "authors": "O Avrahami; T Hayes; O Gafni; S Gupta; Y Taigman; D Parikh; D Lischinski; O Fried; X Yin"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Efficient and interpretable information retrieval for product question answering with heterogeneous data",
+            "journal": "",
+            "year": "2024",
+            "authors": "B Biswas; R Ramnath"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Retrieval-augmented diffusion models",
+            "journal": "",
+            "year": "2022",
+            "authors": "A Blattmann; R Rombach; K Oktay; J Müller; B Ommer"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Instructpix2pix: Learning to follow image editing instructions",
+            "journal": "",
+            "year": "2023",
+            "authors": "T Brooks; A Holynski; A A Efros"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Language models are few-shot learners",
+            "journal": "",
+            "year": "2020",
+            "authors": "T B Brown"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Pixart-sigma: Weak-to-strong training of diffusion transformer for 4k text-to-image generation",
+            "journal": "",
+            "year": "",
+            "authors": "J Chen; C Ge; E Xie; Y Wu; L Yao; X Ren; Z Wang; P Luo; H Lu; Z Li"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Reimagen: Retrieval-augmented text-to-image generator",
+            "journal": "",
+            "year": "2022",
+            "authors": "W Chen; H Hu; C Saharia; W W Cohen"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Imagenet: A large-scale hierarchical image database",
+            "journal": "Ieee",
+            "year": "2009",
+            "authors": "J Deng; W Dong; R Socher; L.-J Li; K Li; L Fei-Fei"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Diffusion models beat gans on image synthesis",
+            "journal": "Advances in neural information processing systems",
+            "year": "2021",
+            "authors": "P Dhariwal; A Nichol"
+        },
+        {
+            "ref_id": "b14",
+            "title": "An image is worth one word: Personalizing text-to-image generation using textual inversion",
+            "journal": "",
+            "year": "2023",
+            "authors": "R Gal; Y Alaluf; Y Atzmon; O Patashnik; A H Bermano; G Chechik; D Cohen-Or"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Encoder-based domain tuning for fast personalization of text-to-image models",
+            "journal": "ACM Transactions on Graphics (TOG)",
+            "year": "2023",
+            "authors": "R Gal; M Arar; Y Atzmon; A H Bermano; G Chechik; D Cohen-Or"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Lcm-lookahead ImageRAG for encoder-based text-to-image personalization",
+            "journal": "",
+            "year": "",
+            "authors": "R Gal; O Lichter; E Richardson; O Patashnik; A H Bermano; G Chechik; D Cohen-Or"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Retrieval-augmented generation for large language models: A survey",
+            "journal": "",
+            "year": "2023",
+            "authors": "Y Gao; Y Xiong; X Gao; K Jia; J Pan; Y Bi; Y Dai; J Sun; H Wang"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Grape: A generate-plan-edit framework for compositional t2i synthesis",
+            "journal": "",
+            "year": "2024",
+            "authors": "A Goswami; S K Modi; S R Deshineni; H Singh; P Singla"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Analogist: Out-of-the-box visual in-context learning with image diffusion model",
+            "journal": "ACM Transactions on Graphics (TOG)",
+            "year": "2024",
+            "authors": "Z Gu; S Yang; J Liao; J Huo; Y Gao"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Not every image is worth a thousand words: Quantifying originality in stable diffusion",
+            "journal": "",
+            "year": "2024",
+            "authors": "A Haviv; S Sarfaty; U Hacohen; N Elkin-Koren; R Livni; A H Bermano"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Prompt-to-prompt image editing with cross-attention control",
+            "journal": "",
+            "year": "2022",
+            "authors": "A Hertz; R Mokady; J Tenenbaum; K Aberman; Y Pritch; D Cohen-Or"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Denoising diffusion probabilistic models",
+            "journal": "",
+            "year": "2020",
+            "authors": "J Ho; A Jain; P Abbeel"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Lora: Low-rank adaptation of large language models",
+            "journal": "",
+            "year": "2021",
+            "authors": "E J Hu; P Wallis; Z Allen-Zhu; Y Li; S Wang; L Wang; W Chen"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Instructimagen: Image generation with multi-modal instruction",
+            "journal": "",
+            "year": "2024",
+            "authors": "H Hu; K C Chan; Y.-C Su; W Chen; Y Li; K Sohn; Y Zhao; X Ben; B Gong; W Cohen"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Gpt-4o system card",
+            "journal": "",
+            "year": "2024",
+            "authors": "A Hurst; A Lerer; A P Goucher; A Perelman; A Ramesh; A Clark; A Ostrow; A Welihinda; A Hayes; A Radford"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Survey of hallucination in natural language generation",
+            "journal": "ACM Computing Surveys",
+            "year": "2023",
+            "authors": "Z Ji; N Lee; R Frieske; T Yu; D Su; Y Xu; E Ishii; Y J Bang; A Madotto; P Fung"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Leveraging out-of-domain selfsupervision for multi-modal video deepfake detection. Master's thesis",
+            "journal": "",
+            "year": "",
+            "authors": "G Knafo;  Fakeout"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Multi-concept customization of text-to-image diffusion",
+            "journal": "",
+            "year": "2023",
+            "authors": "N Kumari; B Zhang; R Zhang; E Shechtman; J.-Y Zhu"
+        },
+        {
+            "ref_id": "b29",
+            "title": "",
+            "journal": "",
+            "year": "2023",
+            "authors": "B F Labs;  Flux"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Retrieval-augmented generation for knowledgeintensive nlp tasks",
+            "journal": "",
+            "year": "2020",
+            "authors": "P Lewis; E Perez; A Piktus; F Petroni; V Karpukhin; N Goyal; H Küttler; M Lewis; W.-T Yih; T Rocktäschel"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Revisiting fine-grained lora for effective personalization and stylization in text-to-image generation",
+            "journal": "",
+            "year": "2024",
+            "authors": "L Li; H Zeng; C Yang; H Jia; D Xu; Lora Block-Wise"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Fine-grained visual classification of aircraft",
+            "journal": "",
+            "year": "2013",
+            "authors": "S Maji; E Rahtu; J Kannala; M Blaschko; A Vedaldi"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Null-text inversion for editing real images using guided diffusion models",
+            "journal": "",
+            "year": "2023",
+            "authors": "R Mokady; A Hertz; K Aberman; Y Pritch; D Cohen-Or"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Context diffusion: Incontext aware image generation",
+            "journal": "Springer",
+            "year": "2024",
+            "authors": "I Najdenkoska; A Sinha; A Dubey; D Mahajan; V Ramanathan; F Radenovic"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Visual instruction inversion: Image editing via image prompting",
+            "journal": "Advances in Neural Information Processing Systems",
+            "year": "2024",
+            "authors": "T Nguyen; Y Li; U Ojha; Y J Lee"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Mystyle: A personalized generative prior",
+            "journal": "ACM Transactions on Graphics (TOG)",
+            "year": "2022",
+            "authors": "Y Nitzan; K Aberman; Q He; O Liba; M Yarom; Y Gandelsman; I Mosseri; Y Pritch; D Cohen-Or"
+        },
+        {
+            "ref_id": "b37",
+            "title": "Lazy diffusion transformer for interactive image editing",
+            "journal": "",
+            "year": "2024",
+            "authors": "Y Nitzan; Z Wu; R Zhang; E Shechtman; D Cohen-Or; T Park; M Gharbi"
+        },
+        {
+            "ref_id": "b38",
+            "title": "Teaching clip to count to ten",
+            "journal": "",
+            "year": "2023",
+            "authors": "R Paiss; A Ephrat; O Tov; S Zada; I Mosseri; M Irani; T Dekel"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Nested attention: Semanticaware attention values for concept personalization",
+            "journal": "",
+            "year": "2025",
+            "authors": "O Patashnik; R Gal; D Ostashev; S Tulyakov; K Aberman; D Cohen-Or"
+        },
+        {
+            "ref_id": "b40",
+            "title": "Sdxl: Improving latent diffusion models for high-resolution image synthesis",
+            "journal": "",
+            "year": "2024",
+            "authors": "D Podell; Z English; K Lacey; A Blattmann; T Dockhorn; J Müller; J Penna; R Rombach"
+        },
+        {
+            "ref_id": "b41",
+            "title": "Learning transferable visual models from natural language supervision",
+            "journal": "PMLR",
+            "year": "2021",
+            "authors": "A Radford; J W Kim; C Hallacy; A Ramesh; G Goh; S Agarwal; G Sastry; A Askell; P Mishkin; J Clark"
+        },
+        {
+            "ref_id": "b42",
+            "title": "In-context retrieval-augmented language models",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "O Ram; Y Levine; I Dalmedigos; D Muhlgay; A Shashua; K Leyton-Brown; Y Shoham"
+        },
+        {
+            "ref_id": "b43",
+            "title": "Cola: A benchmark for compositional text-to-image retrieval",
+            "journal": "Advances in Neural Information Processing Systems",
+            "year": "2024",
+            "authors": "A Ray; F Radenovic; A Dubey; B Plummer; R Krishna; K Saenko"
+        },
+        {
+            "ref_id": "b44",
+            "title": "probabilistic relevance framework: Bm25 and beyond",
+            "journal": "Foundations and Trends® in Information Retrieval",
+            "year": "2009",
+            "authors": "S Robertson; H Zaragoza"
+        },
+        {
+            "ref_id": "b45",
+            "title": "High-resolution image synthesis with latent diffusion models",
+            "journal": "",
+            "year": "2022",
+            "authors": "R Rombach; A Blattmann; D Lorenz; P Esser; B Ommer"
+        },
+        {
+            "ref_id": "b46",
+            "title": "Dreambooth: Fine tuning text-to-image diffusion models for subject-driven generation",
+            "journal": "",
+            "year": "2023",
+            "authors": "N Ruiz; Y Li; V Jampani; Y Pritch; M Rubinstein; K Aberman"
+        },
+        {
+            "ref_id": "b47",
+            "title": "Norm-guided latent space exploration for text-to-image generation",
+            "journal": "",
+            "year": "2024",
+            "authors": "D Samuel; R Ben-Ari; N Darshan; H Maron; G Chechik"
+        },
+        {
+            "ref_id": "b48",
+            "title": "Generating images of rare concepts using pre-trained diffusion models",
+            "journal": "",
+            "year": "2024",
+            "authors": "D Samuel; R Ben-Ari; S Raviv; N Darshan; G Chechik"
+        },
+        {
+            "ref_id": "b49",
+            "title": "Laion-5b: An open large-scale dataset for training next generation image-text models",
+            "journal": "Advances in Neural Information Processing Systems",
+            "year": "2022",
+            "authors": "C Schuhmann; R Beaumont; R Vencu; C Gordon; R Wightman; M Cherti; T Coombes; A Katta; C Mullis; M Wortsman"
+        },
+        {
+            "ref_id": "b50",
+            "title": "knn-diffusion: Image generation via large-scale retrieval",
+            "journal": "",
+            "year": "2022",
+            "authors": "S Sheynin; O Ashual; A Polyak; U Singer; O Gafni; E Nachmani; Y Taigman"
+        },
+        {
+            "ref_id": "b51",
+            "title": "Instantbooth: Personalized text-to-image generation without test-time finetuning",
+            "journal": "",
+            "year": "2024",
+            "authors": "J Shi; W Xiong; Z Lin; H J Jung"
+        },
+        {
+            "ref_id": "b52",
+            "title": "Deep image fingerprint: Towards low budget synthetic image detection and model lineage analysis",
+            "journal": "",
+            "year": "2024",
+            "authors": "S Sinitsa; O Fried"
+        },
+        {
+            "ref_id": "b53",
+            "title": "Generative multimodal models are in-context learners",
+            "journal": "",
+            "year": "2024",
+            "authors": "Q Sun; Y Cui; X Zhang; F Zhang; Q Yu; Y Wang; Y Rao; J Liu; T Huang; X Wang"
+        },
+        {
+            "ref_id": "b54",
+            "title": "The inaturalist species classification and detection dataset",
+            "journal": "",
+            "year": "2018",
+            "authors": "G Van Horn; O Mac Aodha; Y Song; Y Cui; C Sun; A Shepard; H Adam; P Perona; S Belongie"
+        },
+        {
+            "ref_id": "b55",
+            "title": "Inquire: A natural world text-to-image retrieval benchmark",
+            "journal": "",
+            "year": "2024",
+            "authors": "E Vendrow; O Pantazis; A Shepard; G Brostow; K E Jones; O Mac Aodha; S Beery; G Van Horn"
+        },
+        {
+            "ref_id": "b56",
+            "title": "Extended textual conditioning in text-to-image generation",
+            "journal": "",
+            "year": "2023",
+            "authors": "A Voynov; Q Chu; D Cohen-Or; K Aberman;  P+"
+        },
+        {
+            "ref_id": "b57",
+            "title": "The caltech-ucsd birds-200",
+            "journal": "",
+            "year": "2011",
+            "authors": "C Wah; S Branson; P Welinder; P Perona; S Belongie"
+        },
+        {
+            "ref_id": "b58",
+            "title": "Multimodal llm as an agent for unified image generation and editing",
+            "journal": "",
+            "year": "",
+            "authors": "Z Wang; A Li; Z Li; X Liu;  Genartist"
+        },
+        {
+            "ref_id": "b59",
+            "title": "In-context learning unlocked for diffusion models",
+            "journal": "Advances in Neural Information Processing Systems",
+            "year": "2023",
+            "authors": "Z Wang; Y Jiang; Y Lu; P He; W Chen; Z Wang; M Zhou"
+        },
+        {
+            "ref_id": "b60",
+            "title": "Fine-grained image analysis with deep learning: A survey",
+            "journal": "IEEE Transactions on Pattern Analysis and Machine Intelligence",
+            "year": "2022",
+            "authors": "X Wei; Y Song; O Aodha; J Wu; Y Peng; J Tang; J Yang; S Belongie"
+        },
+        {
+            "ref_id": "b61",
+            "title": "Elite: Encoding visual concepts into textual embeddings for customized text-to-image generation",
+            "journal": "",
+            "year": "2023",
+            "authors": "Y Wei; Y Zhang; Z Ji; J Bai; L Zhang; W Zuo"
+        },
+        {
+            "ref_id": "b62",
+            "title": "Unified image generation",
+            "journal": "",
+            "year": "2024",
+            "authors": "S Xiao; Y Wang; J Zhou; H Yuan; X Xing; R Yan; S Wang; T Huang; Z Liu;  Omnigen"
+        },
+        {
+            "ref_id": "b63",
+            "title": "Text compatible image prompt adapter for text-to-image diffusion models",
+            "journal": "",
+            "year": "2023",
+            "authors": "H Ye; J Zhang; S Liu; X Han; W Yang;  Ip-Adapter"
+        },
+        {
+            "ref_id": "b64",
+            "title": "Sigmoid loss for language image pre-training",
+            "journal": "",
+            "year": "2023",
+            "authors": "X Zhai; B Mustafa; A Kolesnikov; L Beyer"
+        },
+        {
+            "ref_id": "b65",
+            "title": "Detr with improved denoising anchor boxes for end-to-end object detection",
+            "journal": "",
+            "year": "",
+            "authors": "H Zhang; F Li; S Liu; L Zhang; H Su; J Zhu; L Ni; H.-Y Shum;  Dino"
+        },
+        {
+            "ref_id": "b66",
+            "title": "Towards ai-driven sign language generation with non-manual markers",
+            "journal": "",
+            "year": "2025",
+            "authors": "H Zhang; R Shalev-Arkushin; V Baltatzis; C Gillis; G Laput; R Kushalnagar; L Quandt; L Findlater; A Bedri; C Lea"
+        },
+        {
+            "ref_id": "b67",
+            "title": "Adding conditional control to text-to-image diffusion models",
+            "journal": "",
+            "year": "2023",
+            "authors": "L Zhang; A Rao; M Agrawala"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 3 :3Figure3: Top: a high-level overview of our method. Given a text prompt <p>, we generate an initial image using a text-to-image (T2I) model. Then, we generate retrieval-captions <c j >, retrieve images from an external database for each caption <i j >, and use them as references to the model for better generation. Bottom: the retrieval-caption generation block. We use a VLM to decide if the initial image matches the given prompt. If not, we ask it to list the missing concepts, and to create a caption that could be used to retrieve appropriate examples for each of these missing concepts.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 4 :4Figure 4: Personalized generation example. ImageRAG can work in parallel with personalization methods and enhance their capabilities. For example, although OmniGen can generate images of a subject based on an image, it struggles to generate some concepts. Using references retrieved by our method, it can generate the required result.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 5 :5Figure5: Retrieval dataset size vs. CLIP score on Ima-geNet (left) and Aircraft (right). Dashed lines represent the scores of the base models. Even relatively small, unspecialized retrieval sets can already improve results. More data leads to further increased scores. However, small sets may not contain relevant retrieval examples, and their use may harm results, particularly for stronger models.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Fig. 77Fig.7shows qualitative examples from the ImageNet(Deng et al., 2009), CUB(Wah et al., 2011) and iNaturalist(Van Horn et al., 2018) datasets, comparing the results of OmniGen and SDXL with and without our method.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 7 :7Figure 7: Qualitative comparisons: rare concept generation. Examples from ImageNet(Deng et al., 2009), CUB(Wah et al., 2011) and iNaturalist (Van Horn et al., 2018). The left-most image column is the retrieved reference using ImageRAG for each prompt. OmniGen and SDXL both struggle with the uncommon concepts, sometimes generating similar concepts such as a bull or a cow instead of the dog breed \"Boston bull\", while in other times, they generate completely unrelated images, as in the case of \"Chow\", or \"Geococcyx\". When using ImageRAG both models generate the correct concept.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "•Better text alignment (choose A or B) • Better visual quality (choose A or B) • Overall preference (choose A or B) Pair examples of using our method vs. other retrieval-based generation approaches can be found in Fig. 8. Due to lack of access to the models, all prompts and results of the other methods were taken from their papers. Pair examples of rare or fine-grained concept generation with and without ImageRAG are presented in Fig. 9 (SDXL examples), and Fig. 10 (OmniGen examples). More complex creative examples are presented in Fig. 11.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "910",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 9 :Figure 10 :910Figure 9: Examples of rare concept generation using ImageRAG with SDXL. Real examples are taken from the iNaturalist (Van Horn et al., 2018) dataset.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "figure",
+            "figure_id": "fig_7",
+            "figure_caption": "Figure 11 :11Figure 11: More creative generation examples.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "User study results. Users preference percentage of our method compared to other methods in terms of text alignment, visual quality, and overall preference.",
+            "figure_data": "0% Text Quality Overall 0% Text Quality Overall50% Win Rate 96% 87% 94% SDXL 50% Win Rate 79% 74% 78% ReImagen 0% Text Quality Overall100% 4% 13% 6% 100% 21% 26% 22% Win Rate Text 0% Quality Overall 0% Text Quality Overall 50% 75% 79% 80% RDM50% 96% OmniGen 90% 98% Win Rate 50% 70% KNN-Diffusion 77% 73% Win Rate 100% 20% 21% 25%4% 10% 2% 100% 23% 30% 27% 100%ImageRAG (Ours)non-RAG BaselineRAG BaselinesFigure 6:"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Additional proprietary data usage experiments. Proprietary-O 0.269 ± 0.003 0.136 ± 0.002 0.773 ± 0.004 0.212 ± 0.002 0.114 ± 0.001 0.732 ± 0.002 LAION-SD 0.314 ± 0.001 0.174 ± 0.002 0.784 ± 0.001 0.243 ± 0.002 0.118 ± 0.001 0.724 ± 0.002 Proprietary-SD 0.314 ± 0.002 0.175 ± 0.001 0.786 ± 0.003 0.251 ± 0.002 0.118 ± 0.002 0.737 ± 0.002 2018) datasets are presented in Tab. 5.",
+            "figure_data": "Results for using each dataset as the retrieval-dataset(\"Proprietary-<model>\") vs. using our subset from LAIONas the retrieval-dataset (\"LAION-<model>\"). Here, \"O\"indicates OmniGen based models, \"SD\" indicates SDXLbased models. Best results for each model are bolded.CUBiNaturalistCLIP ↑SigLIP ↑DINO ↑CLIP ↑SigLIP ↑DINO ↑LAION-O0.253 ± 0.003 0.125 ± 0.002 0.760 ± 0.003 0.197 ± 0.002 0.095 ± 0.002 0.701 ± 0.002"
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "for i ∈ [1, n] is a com- patible image caption of the image <img i,j >, j ∈ [1, k].",
+            "formula_coordinates": [
+                5.0,
+                55.44,
+                70.22,
+                235.65,
+                21.61
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "ImageNet iNaturalist CUB Aircraft CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑",
+            "formula_coordinates": [
+                6.0,
+                104.07,
+                139.74,
+                428.46,
+                13.68
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "ImageNet Aircraft CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑",
+            "formula_coordinates": [
+                6.0,
+                98.31,
+                312.95,
+                181.05,
+                12.15
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "ImageNet CUB CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑",
+            "formula_coordinates": [
+                6.0,
+                108.83,
+                451.49,
+                171.07,
+                11.48
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "ImageNet CUB CLIP ↑ SigLIP ↑ DINO ↑ CLIP ↑ SigLIP ↑ DINO ↑",
+            "formula_coordinates": [
+                7.0,
+                97.98,
+                115.51,
+                181.36,
+                12.17
+            ]
+        }
+    ],
+    "doi": ""
+}

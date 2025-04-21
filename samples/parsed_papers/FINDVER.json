@@ -1,0 +1,873 @@
+{
+    "title": "FINDVER: Explainable Claim Verification over Long and Hybrid-Content Financial Documents",
+    "caption": "An overview of FINDVER construction pipeline",
+    "authors": "Yilun Zhao; Yitao Long; Yuru Jiang; Chengye Wang; Weiyuan Chen; Hongjun Liu; Yiming Zhang; Xiangru Tang; Chen Zhao; Arman Cohan",
+    "pub_date": "",
+    "abstract": "We introduce FINDVER, a comprehensive benchmark specifically designed to evaluate the explainable claim verification capabilities of LLMs in the context of understanding and analyzing long, hybrid-content financial documents. FINDVER is divided into three subsets: information extraction, numerical reasoning, and knowledge-intensive reasoning-each addressing common scenarios encountered in real-world financial contexts. We assess a broad spectrum of LLMs under long-context and RAG settings. Our results show that even the current best-performing system, Claude-3.5-Sonnet, significantly lags behind human experts. Our detailed findings and insights highlight the strengths and limitations of existing LLMs in this new task. We believe FINDVER can serve as a valuable benchmark for evaluating LLM capabilities in claim verification over complex, expert-domain documents.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": "In today's information explosion era, the responsibility of verifying the truthfulness of the item is often passed on to the audience.unverified claims about a company's financial performance frequently circulate in online media, potentially misleading investors. Therefore, it is crucial to verify these claims using the companies' original financial documents (i.e., earnings reports and regulatory filings). Recent advancements in Large Language Models (LLMs) have attracted significant attention due to their capabilities in solving a broad range of tasks (Touvron et al., 2023b;Jiang et al., 2023b;OpenAI, 2023a). However, it remains particularly difficult for applying them to document-grounded claim verification in real-world financial domains due to the following two reasons:\nFirst, financial documents are typically long, intricate and dense, and they include both quantita-Figure 1: An example from the numerical reasoning subset of the FINDVER benchmark. To verify the claim, the LLM is required to first locate claim-relevant data points within long and hybrid-content financial documents, and then apply numerical reasoning over the extracted data points for claim verification.\ntive tables and qualitative text (Chen et al., 2021;Zhu et al., 2021;Zhao et al., 2022Zhao et al., , 2023d;;Koncel-Kedziorski et al., 2024). Extracting and analyzing claim-relevant data from these documents requires complicated document comprehension abilities and professional knowledge in financial domains. Moreover, the type of reasoning involved encompasses various unique aspects that are less studied, necessitating a dedicated approach to evaluation and application.\nSecond, in the financial domain, where decisions often involve significant stakes, it is often critical to provide clear and comprehensible rationales for any claim verification decisions (Atanasova et al., 2020(Atanasova et al., , 2023)). However, existing context-grounded claim verification benchmarks (Chen et al., 2020;Kamoi et al., 2023;Lu et al., 2023;Glockner et al., 2024) primarily focus on the task of entailment classification and do not evaluate the reasoning process. This hinders the practical application and evaluation of LLMs in real-world scenarios.\nIn response to the aforementioned pressing need, we present FINDVER, a comprehensive and domain expert-annotated explainable claim verification benchmark that first explores in the context of financial documents. The LLMs are tasked with generating explanations of their reasoning to verify claims labeled as \"entailed\" or \"refuted\", based on the information in the provided document, which contains both textual and tabular data. To identify the common reasoning-intensive scenarios in claim verification based on financial documents, we engage with domain experts and conducted a preliminary study. This helped us determine three key types of scenarios that frequently arise in realworld settings: information extraction, numerical reasoning, and knowledge-intensive reasoning. For each scenario, we construct an evaluation set. Each example in our dataset is annotated with detailed supporting evidence and step-by-step reasoningprocess explanations. We evaluate a wide spectrum of open-and closed-source LLMs, specifically, 19 models from 10 organizations. The documents in our benchmark are exceedingly long; therefore, we employ two widely adopted real-world application settings-retrieval augmented generation (RAG) and long-context-in this study. The experimen-tal results indicate that even the existing bestperforming LLM (i.e., Claude-3.5-Sonnet) still significantly lags behind human experts (77.2% versus 93.3%), demonstrating the challenges of our proposed benchmark. Our contributions are summarized below:\n• We introduce FINDVER, the first comprehensive context-grounded claim verification benchmark for financial domains, presenting new challenges for state-of-the-art LLMs.\n• We conduct an extensive evaluation that encompasses a wide range of LLMs, including those specialized in finance and math. We also evaluate both long-context and RAG settings to comprehensively assess the capabilities and limitations of existing LLMs in our task.\n• Our experimental results reveal a noticeable performance gap compared to human experts. This highlights the limitations of current LLMs in complex real-world applications and the need for continued advancements.",
+            "publication_ref": [
+                "b11",
+                "b70",
+                "b61",
+                "b24",
+                "b7",
+                "b6",
+                "b10",
+                "b23",
+                "b30",
+                "b16"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": "Claim Verification Benchmark Claim verification is a well-established research area with two main settings. The first is the open-domain setting, which involves using an external retriever to find the most relevant information from a large corpus to verify claims (Vlachos and Riedel, 2014;Thorne et al., 2018;Aly et al., 2021;Wadden et al., 2022;Rangapur et al., 2024;Ma et al., 2024). The second setting is context-grounded claim verification, which requires models to verify claims based on the provided document context (Chen et al., 2020;Kamoi et al., 2023;Lu et al., 2023;Glockner et al., 2024). This work focuses on the second setting, as it allows us to eliminate variability and dependency on the retriever's performance, thereby focusing on the evaluation of LLM performance on on accurately verifying claims within a given context. However, as illustrated in Table 1, existing contextgrounded claim verification benchmarks have four notable limitations: they typically 1) focus on general domains, overlooking the specific challenges and intricacies present in specialized fields, 2) focus solely on entailment classification and do not evaluate the reasoning processes of models, 3) do not involve claims that require intensive reasoning and complicated document comprehension. These limitations hinder their effectiveness for evaluating LLMs in real-world practice.\nFinancial Evaluation Benchmark NLP techniques have been applied to various financial tasks, such as named entity recognition (Salinas Alvarado et al., 2015;Shah et al., 2023), sentiment analysis (Malo et al., 2013;Maia et al., 2018), stock movement prediction (Soun et al., 2022;Xu and Cohen, 2018;Wu et al., 2018), and summarization (Zhou et al., 2021;Mukherjee et al., 2022;Liu et al., 2022). More recently, there has been an increasing focus on tasks involving financial documents (e.g., annual reports and regulatory filings), which are crucial for providing insights into a company's performance and strategies. Several QA benchmarks have been proposed to evaluate models' performance in answering questions based on financial documents, with a particular focus on numerical reasoning (Chen et al., 2021;Zhu et al., 2021;Zhao et al., 2022;Chen et al., 2022b;Koncel-Kedziorski et al., 2024;Zhao et al., 2024b,a). Despite these advancements, there remains a significant gap in the exploration of claim verification tasks within the financial domain. While the recent FIN-FACT benchmark (Rangapur et al., 2024) addresses explainable multimodal financial factchecking, it primarily focuses on open-domain sce-narios. Verifying claims derived from financial documents is crucial, as inaccuracies can significantly influence investment decisions and market perceptions. To bridge this gap, we introduce FINDVER, the first context-grounded claim verification benchmark, specifically designed for real-world financial document comprehension.",
+            "publication_ref": [
+                "b50",
+                "b47",
+                "b4",
+                "b52",
+                "b38",
+                "b31",
+                "b10",
+                "b23",
+                "b30",
+                "b16",
+                "b40",
+                "b41",
+                "b33",
+                "b32",
+                "b43",
+                "b58",
+                "b54",
+                "b69",
+                "b34",
+                "b27",
+                "b11",
+                "b70",
+                "b61",
+                "b24",
+                "b38"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "FINDVER Benchmark",
+            "text": "FINDVER provides a robust evaluation benchmark for reasoning-intensive and explainable claim verification over long and hybrid-content financial documents. We present an overview of the FINDVER construction pipeline in Figure 2; and detail the task formulation, data construction, and quality validation process in the following subsections.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Task Formulation",
+            "text": "We formally define the task of FINDVER within the context of LLMs as follows: Consider a single financial document d, containing textual data P and tabular data T , associated with a claim c that needs verification. The expert-annotated data we collect supports the following two tasks:\nEntailment Classification The model is required to determine the entailment label ℓ ∈ L = {\"entailed\", \"refuted\"}, based on the document context:\nℓ = arg max ℓ∈L P LLM (ℓ | P, T, c)(1)",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Reasoning-process Explanation Generation",
+            "text": "The model is required to generate a natural language explanation e: e = arg max\ne P LLM (e | P, T, c)(2)\nwhich articulates the reasoning process behind the validity of the provided claim c, based solely on the provided textual content P and tabular content T within the financial document.\nNotably, some claim verification systems, particularly those developed prior to the era of LLMs and for previous datasets that did not require explanation generation (Chen et al., 2020;Yin et al., 2021;Koreeda et al., 2021), might not explicitly perform explanation generation. Instead, they directly output the final label. For such systems, FINDVER can also be used for evaluation by focusing on the entailment classification task. ",
+            "publication_ref": [
+                "b10",
+                "b60",
+                "b25"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "FINDVER Subset Design",
+            "text": "FINDVER is designed to mirror the real-world challenges encountered in the financial domain.\nTherefore, we ensure that the included annotators are financial experts with professional experience in comprehending and processing financial documents. Table 7 in Appendix presents the detailed annotator biographies for FINDVER annotation.\nTo identify the common reasoning-intensive scenarios in claim verification based on financial documents, we engaged with domain experts and conducted a preliminary study. This helped us determine three key types of scenarios that frequently arise in real-world settings. Accordingly, we have created three corresponding subsets of FINDVER.\n(1) FDV-IE (information extraction), which involves extracting information from both textual and tabular content within a long-context document.\n(2) FDV-MATH (numerical reasoning), which necessitates performing calculations or statistical analysis based on data within the document.\n(3) FDV-KNOW (knowledge-intensive reasoning), which requires integrating external domain-specific knowledge or regulations for claim verification.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Source Document Collection",
+            "text": "Similar to Zhao et al. (2023a), we use the quarterly (Form 10-Q) and annual reports (Form 10-K) of companies as the source documents, which are publicly available in the open-source database1 of the U.S. Securities and Exchange Commission. We collect a total of 523 documents that were first released between January 1 to April 30, 2024, which is after the cutoff date of most pretraining corpora for training foundation models. This helps to alleviate issues related to data memorization to some extent. After collecting the raw HTML-format documents, we utilize the SEC API2 , a commercial platform API for extracting financial document content, to process the collected documents, obtaining documents with both textual and tabular data.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Claim Annotation",
+            "text": "Entailed Claim Annotation To address the potential bias concerning the position of evidence within the documents, we initiate the process by randomly sampling multiple document contexts from the given document. Annotators are then tasked with creating \"entailed\" claims based on the textual and tabular data within these contexts. The annotators are instructed to simulate real-world document comprehension scenarios, ensuring the annotated claims are representative of practical financial analysis and align with the scenarios defined by the corresponding subsets. Annotators are then tasked with carefully locating all evidence (i.e., indices of relevant paragraphs and tables) within the entire document that support the claims, which are used for the subsequent data validation.\nRefuted Claim Annotation Following established practices in the field (Wadden et al., 2020;Chen et al., 2020;Lu et al., 2023), and since directly obtaining \"refuted\" types is difficult, we instead perturb the original \"entailed\" claims into \"refuted\" claim through expert annotation. Specifically, expert annotators first create an \"entailed\" claim using the same procedure detailed in the \"Entailed Claim Annotation\" paragraph. The annotators are then instructed to perturb the \"entailed\" claim to introduce factual errors that are directly contradicted by the annotated evidence, and rewrite the annotated reasoning-process explanation. ",
+            "publication_ref": [
+                "b51",
+                "b10",
+                "b30"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Explanation Annotation",
+            "text": "After finishing the claim annotation, we pass it to another annotator for explanation annotation. The annotators are required to first read the claim carefully and annotate a detailed explanation of the reasoning process. Such reasoning-process explanations allow for a granular and informative evaluation of model outputs, helping future work identify reasoning errors and provide more accurate error feedback. We compare the entailment label annotated in this step with those in the claim annotation step. A third annotator is introduced if the two annotation versions are different. In practice, we achieve an inter-annotator agreement of 90.3% for entailment label annotation.\nDuring our pilot annotation phase, we observed variability in the format of reasoning-process explanation annotated by different annotators, which made the dataset less standardized. To ensure consistency and clarity in our benchmark, we developed a predefined template for annotators to follow. Specifically, annotators are required to commence with the extraction of relevant information phase, where they need to list all claim-relevant information in a numbered list. Subsequently, they are required to annotate the reasoning over the extracted information segment in a step-by-step manner. For each step, they should elucidate the associated reasoning. Finally, they annotate the entailment label feature.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Data Quality Validation",
+            "text": "To ensure the high quality of our annotated data, for every annotated example, a qualified annotator is assigned to validate several key aspects: (1) the claim and reasoning-process explanation should be grammatically correct and free of spelling errors;\n(2) the claim should be closely related to financial domains and meaningful in real-world scenarios;\n(3) the annotated evidence should be relevant to the claim and complete enough to verify it; (4) the entailment label of the claim should be supported by the annotated evidence; and (5) the reasoningprocess explanation should correctly interpret the extracted evidence and apply appropriate reasoning steps to correctly verify the claim. The validators are asked to revise examples that do not meet these standards. In practice, 347 out of 2,100 initial examples were revised by the validators. We also report the human evaluation scores over 100 sampled examples. As illustrated in Table 2, FINDVER has a high annotation quality.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Dataset Preparation and Release",
+            "text": "Table 3 provides an overview of the key statistics for our benchmark. The dataset is randomly split into two subsets: testmini and test. The testmini set is intended for model development and validation. It contains 600 examples, with 200 examples from each subset. The test set comprises the remaining 1,500 examples and is designed for standard evaluation. To prevent data contamination (Jacovi et al., 2023;Shi et al., 2024;Deng et al., 2024), the ground-truth-related annotation features for the test set will not be publicly released. Instead, we provide an online evaluation platform where researchers can assess their models and participate in a public leaderboard.",
+            "publication_ref": [
+                "b18",
+                "b42",
+                "b13"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_3"
+            ]
+        },
+        {
+            "heading": "Experiment Setup",
+            "text": "We next present the experimental setup, covering the evaluated LLMs, long-context and RAG setups, implementation details, and the measurement of human-level performance.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimented LLMs",
+            "text": "We examine the performance of LLMs across two distinct categories on FINDVER: (1) Proprietary LLMs, including GPT-4* (OpenAI, 2023a,b, 2024), Gemini-1.5-* (Gemini, 2024), and Claude-3 (Anthropic, 2024); and (2) Open-source LLMs, including Gemma (Team et al., 2024)   2&3 (Touvron et al., 2023a;Meta, 2024), Yi-1.5 (AI et al., 2024), Qwen-2 (qwe, 2024), Mistral & Mixtral (Jiang et al., 2023a(Jiang et al., , 2024)), In-ternLM2 (Team, 2024), C4AI (Aryabumi et al., 2024), GLM (Du et al., 2022), and Phi-3 (Abdin et al., 2024). The experiments for open-sourced LLMs were conducted using the vLLM framework (Kwon et al., 2023). For all the experiments, we set temperature as 1.0 and maximum output length as 512. We adopt the Chain-of-Thought (CoT) prompting methods (Wei et al., 2022) for the FINDVER benchmark. Specifically, the model is instructed to first output a detailed reasoning process for verifying claims, and then provide the entailment label of the claim based on the generated reasoning process. Figure 3 presents the used prompts.",
+            "publication_ref": [
+                "b15",
+                "b5",
+                "b14",
+                "b73",
+                "b26",
+                "b53"
+            ],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Long-Context and RAG Settings",
+            "text": "As presented in Table 3, the documents within our benchmark are notably lengthy. To effectively handle this, we have implemented two real-world application settings that are widely recognized for their utility in dealing with extensive texts. For Long-context Setting, we input the entire financial document into the model. We limit our evaluation to those models that have a context window larger than 100,000 tokens, which exeeds the maximum length of the included financial document. For RAG Setting, we leverage the current best-performing embedding models (i.e., OpenAI's text-embedding-3-large) to retrieve the top-10 paragraphs or tables that are most relevant to the claims. These elements are then concatenated in their original order as found in the document before being fed into the model.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_3"
+            ]
+        },
+        {
+            "heading": "Implementation Details",
+            "text": "Input Tabular Data Serialization Building on previous research that assessed LLMs on tasks involving tabular data (Chen, 2023;Zhao et al., 2023b,c), we introduce our methodology for processing tables within documents. Our approach Model Response Processing Following previous work (Lu et al., 2024), we adopt LLM for processing model response. Specifically, we utilize GPT-4o-mini to extract labels from the LLM output, which can be either \"entailed\", \"refuted\" or \"none\". The \"none\" label typically indicates that the LLM output contains nonsensical symbols or unintelligible text rather than meaningful content.\nIn cases where the output is labeled as \"none\", we assign the final label by making a random guess.",
+            "publication_ref": [
+                "b9",
+                "b29"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Human-level Performance",
+            "text": "To provide a rough but informative estimate of human-level performance by non-experts and experts on FINDVER, we randomly sampled 5 documents × 4 claims / document = 20 claims from each validation subset, totaling 60 claims. We enroll two experts (i.e., professionals with CFA license) and two non-experts (i.e., undergraduate students majored in computer science) to individually verify the claims by providing the NL explanations. Table 4 presents the human-level performance.\n5 Experiment Results Claude-3.5-Sonnet, the highest-performing LLM, achieves an accuracy rate of only 77.2%, in stark contrast to the 93.3% accuracy of financial experts. This discrepancy highlights the complexity and challenges of our benchmark.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_5"
+            ]
+        },
+        {
+            "heading": "Main Findings",
+            "text": "For the less competitive LLMs, such as Qwen2-72B, GLM-4-9B, and Phi-3-medium-128k, they exhibit improved performance under the RAG setting. In contrast, the currently more competitive LLMs, such as GPT-4o and Claude-3.5-Sonnet, generally perform better under the long-context setting compared to the RAG setting. This indicates the potential of developing long-context techniques to manage tasks involving extensive documents in specialized domains.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Chain-of-Thought Analysis",
+            "text": "To better understand the effectiveness of CoT prompting methods for our tasks, we select the commonly-used proprietary and open-source LLMs, GPT-4o and Qwen2-72B, for our experiments. In the w/o CoT setting, we instruct the LLMs to directly output the entailment label of the claim using the provided document context (Figure 4). As illustrated in formance degrades in the w/o CoT setting. These results highlight the importance of CoT reasoning in enhancing performance for our task.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Error Analysis of Reasoning Process",
+            "text": "The Claude-3.5-Sonnet model achieves a top accuracy of 77.2% under the long context setting.\nTo better understand the model's limitations, we perform a detailed error analysis with human evaluators. We randomly select 25 instances from each of the three subsets where the Claude-3.5-Sonnet model fails to perform correctly. Our analysis has identified four primary categories of errors: ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": "This paper presents FINDVER, a comprehensive benchmark designed to evaluate LLMs in claim verification over long and hybrid-content financial documents. Through extensive experiments involving 19 LLMs under long-context and RAG settings, we have demonstrated that even the top-performing models exhibit a significant performance gap compared to financial experts. Our detailed findings and insights reveal the strengths and limitations of current LLMs in this new task. We believe that FINDVER provides a valuable benchmark for future research on LLMs' ability to handle complex claim verification tasks within the expert domain.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": "In this work, we propose FINDVER and conduct comprehensive analysis of different LLMs' capabilities on our task. However, there are still some limitations: First, our evaluation does not include recently released finance-specific LLMs (Wu et al., 2023;Yang et al., 2023;Xie et al., 2023Xie et al., , 2024)), as these models are not yet compatible with the vLLM framework used for inference. Due to computational resource constraints, we do not tune LLMs on a large-scale finance-domain data ourselves. However, we believe that training on finance data can help improve LLMs' capabilities in FINDVER. Moreover, we only conduct human error analysis on the generated reasoning process of models. We believe future work could explore the development of LLM-based automated evaluation systems (Liu et al., 2023;Zheng et al., 2023) for automatically detecting reasoning errors within the generated explanation.",
+            "publication_ref": [
+                "b55",
+                "b28",
+                "b56",
+                "b28",
+                "b68"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ID Finance Industry Experience English Proficiency Annotation Sets",
+            "text": "Evaluator? ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Qwen2 technical report",
+            "journal": "",
+            "year": "2024",
+            "authors": ""
+        },
+        {
+            "ref_id": "b1",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "Marah Abdin; Sam Ade Jacobs; Ammar Ahmad Awan; Jyoti Aneja; Ahmed Awadallah; Hany Awadalla; Nguyen Bach; Amit Bahree; Arash Bakhtiari; Harkirat Behl; Alon Benhaim; Misha Bilenko; Johan Bjorck; Sébastien Bubeck; Martin Cai; Caio César; Teodoro Mendes; Weizhu Chen; Vishrav Chaudhary; Parul Chopra; Allie Del Giorno; Gustavo De Rosa; Matthew Dixon; Ronen Eldan; Dan Iter; Amit Garg; Abhishek Goswami; Suriya Gunasekar; Emman Haider; Junheng Hao; Russell J Hewett; Jamie Huynh; Mojan Javaheripi; Xin Jin; Piero Kauffmann; Nikos Karampatziakis; Dongwoo Kim; Mahoud Khademi; Lev Kurilenko; James R Lee; Yin Tat Lee; Yuanzhi Li; Chen Liang; Weishung Liu; Eric Lin; Zeqi Lin; Piyush Madan; Arindam Mitra; Hardik Modi; Anh Nguyen; Brandon Norick; Barun Patra; Daniel Perez-Becker; Thomas Portet; Reid Pryzant; Heyang Qin; Marko Radmilac; Corby Rosset; Sambudha Roy; Olatunji Ruwase; Olli Saarikivi; Jiahang Xu; Sonali Yadav; Fan Yang; Ziyi Yang; Donghan Yu; Chengruidong Zhang; Cyril Zhang; Jianwen Zhang; Li Lyna Zhang; Yi Zhang; Yue Zhang"
+        },
+        {
+            "ref_id": "b2",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": ": Ai; Alex Young; Bei Chen; Chao Li; Chengen Huang; Ge Zhang; Guanwei Zhang; Heng Li; Jiangcheng Zhu; Jianqun Chen; Jing Chang; Kaidong Yu; Peng Liu; Qiang Liu; Shawn Yue; Senbin Yang; Shiming Yang; Tao Yu; Wen Xie; Wenhao Huang; Xiaohui Hu; Xiaoyi Ren; Xinyao Niu; Pengcheng Nie; Yuchi Xu; Yudong Liu; Yue Wang; Yuxuan Cai; Zhenyu Gu; Zhiyuan Liu"
+        },
+        {
+            "ref_id": "b3",
+            "title": "PubHealthTab: A public health table-based dataset for evidence-based fact checking",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Mubashara Akhtar; Oana Cocarascu; Elena Simperl"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Feverous: Fact extraction and verification over unstructured and structured information",
+            "journal": "",
+            "year": "2021",
+            "authors": "Rami Aly; Zhijiang Guo; Michael Schlichtkrull; James Thorne; Andreas Vlachos"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Introducing the next generation of claude",
+            "journal": "Aya",
+            "year": "2024",
+            "authors": "Viraat Anthropic; John Aryabumi; Dwarak Dang; Saurabh Talupuru; David Dash; Hangyu Cairuz; Bharat Lin; Madeline Venkitesh; Jon Ander Smith; Yi Campos; Kelly Chern Tan; Max Marchisio; Sebastian Bartolo; Acyr Ruder; Julia Locatelli; Nick Kreutzer;  Frosst"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Faithfulness tests for natural language explanations",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Pepa Atanasova; Oana-Maria Camburu; Christina Lioma; Thomas Lukasiewicz; Jakob Grue Simonsen; Isabelle Augenstein"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Generating fact checking explanations",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Pepa Atanasova; Jakob Grue Simonsen; Christina Lioma; Isabelle Augenstein"
+        },
+        {
+            "ref_id": "b8",
+            "title": "2022a. Generating literal and implied subquestions to fact-check complex claims",
+            "journal": "United Arab Emirates. Association for Computational Linguistics",
+            "year": "",
+            "authors": "Jifan Chen; Aniruddh Sriram; Eunsol Choi; Greg Durrett"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Large language models are few(1)-shot table reasoners",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Wenhu Chen"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Tabfact: A large-scale dataset for table-based fact verification",
+            "journal": "",
+            "year": "2020",
+            "authors": "Wenhu Chen; Hongmin Wang; Jianshu Chen; Yunkai Zhang; Hong Wang; Shiyang Li; Xiyou Zhou; William Yang; Wang "
+        },
+        {
+            "ref_id": "b11",
+            "title": "FinQA: A dataset of numerical reasoning over financial data",
+            "journal": "Dominican Republic. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Zhiyu Chen; Wenhu Chen; Charese Smiley; Sameena Shah; Iana Borova; Dylan Langdon; Reema Moussa; Matt Beane; Ting-Hao Huang; Bryan Routledge; William Yang; Wang "
+        },
+        {
+            "ref_id": "b12",
+            "title": "ConvFinQA: Exploring the chain of numerical reasoning in conversational finance question answering",
+            "journal": "",
+            "year": "2022",
+            "authors": "Zhiyu Chen; Shiyang Li; Charese Smiley; Zhiqiang Ma; Sameena Shah; William Yang; Wang "
+        },
+        {
+            "ref_id": "b13",
+            "title": "Unveiling the spectrum of data contamination in language model: A survey from detection to remediation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2024",
+            "authors": "Chunyuan Deng; Yilun Zhao; Yuzhao Heng; Yitong Li; Jiannan Cao"
+        },
+        {
+            "ref_id": "b14",
+            "title": "GLM: General language model pretraining with autoregressive blank infilling",
+            "journal": "",
+            "year": "2022",
+            "authors": "Zhengxiao Du; Yujie Qian; Xiao Liu; Ming Ding; Jiezhong Qiu; Zhilin Yang; Jie Tang"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Gemini 1.5: Unlocking multimodal understanding across millions of tokens of context",
+            "journal": "",
+            "year": "2024",
+            "authors": " Gemini"
+        },
+        {
+            "ref_id": "b16",
+            "title": "AmbiFC: Fact-checking ambiguous claims with evidence",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2024",
+            "authors": "Max Glockner; Ieva Staliūnaitė; James Thorne; Gisela Vallejo; Andreas Vlachos; Iryna Gurevych"
+        },
+        {
+            "ref_id": "b17",
+            "title": "INFOTABS: Inference on tables as semi-structured data",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Vivek Gupta; Maitrey Mehta; Pegah Nokhiz; Vivek Srikumar"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Stop uploading test data in plain text: Practical strategies for mitigating data contamination by evaluation benchmarks",
+            "journal": "Singapore. Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Alon Jacovi; Avi Caciularu; Omer Goldman; Yoav Goldberg"
+        },
+        {
+            "ref_id": "b19",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "Alexandre Albert Q Jiang; Arthur Sablayrolles; Chris Mensch; Devendra Bamford; Diego Singh Chaplot; Florian De Las Casas; Gianna Bressand; Guillaume Lengyel; Lucile Lample;  Saulnier"
+        },
+        {
+            "ref_id": "b20",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "Albert Q Jiang; Alexandre Sablayrolles; Antoine Roux; Arthur Mensch; Blanche Savary; Chris Bamford; Devendra Singh Chaplot; Diego De Las Casas; Emma Bou Hanna; Florian Bressand; Gianna Lengyel; Guillaume Bour; Guillaume Lample; Renard Lélio; Lucile Lavaud; Marie-Anne Saulnier; Pierre Lachaux; Sandeep Stock; Sophia Subramanian; Szymon Yang; Teven Antoniak; Théophile Le Scao; Thibaut Gervet; Thomas Lavril; Timothée Wang;  Lacroix"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Devendra Singh Chaplot, Diego de Las Casas",
+            "journal": "",
+            "year": "2023",
+            "authors": "Albert Qiaochu Jiang; Alexandre Sablayrolles; Arthur Mensch; Chris Bamford; Florian Bressand; Gianna Lengyel; Guillaume Lample; Lucile Saulnier; L' Elio; Renard Lavaud; Marie-Anne Lachaux; Pierre Stock; Teven Le Scao; Thibaut Lavril; Thomas Wang; Timothée Lacroix; William El Sayed"
+        },
+        {
+            "ref_id": "b22",
+            "title": "HoVer: A dataset for many-hop fact extraction and claim verification",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Yichen Jiang; Shikha Bordia; Zheng Zhong; Charles Dognin; Maneesh Singh; Mohit Bansal"
+        },
+        {
+            "ref_id": "b23",
+            "title": "WiCE: Real-world entailment for claims in Wikipedia",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Ryo Kamoi; Tanya Goyal; Juan ; Diego Rodriguez; Greg Durrett"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Bizbench: A quantitative reasoning benchmark for business and finance",
+            "journal": "",
+            "year": "2024",
+            "authors": "Rik Koncel-Kedziorski; Michael Krumdick; Viet Lai; Varshini Reddy; Charles Lovering; Chris Tanner"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Con-tractNLI: A dataset for document-level natural language inference for contracts",
+            "journal": "Dominican Republic. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Yuta Koreeda; Christopher Manning"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Efficient memory management for large language model serving with pagedattention",
+            "journal": "",
+            "year": "2023",
+            "authors": "Woosuk Kwon; Zhuohan Li; Siyuan Zhuang; Ying Sheng; Lianmin Zheng; Cody Hao Yu; Joseph E Gonzalez; Hao Zhang; Ion Stoica"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Long text and multi-table summarization: Dataset and method",
+            "journal": "Association for Computational Linguistics",
+            "year": "1995",
+            "authors": "Shuaiqi Liu; Jiannong Cao; Ruosong Yang; Zhiyuan Wen"
+        },
+        {
+            "ref_id": "b28",
+            "title": "G-eval: NLG evaluation using gpt-4 with better human alignment",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Yang Liu; Dan Iter; Yichong Xu; Shuohang Wang; Ruochen Xu; Chenguang Zhu"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Mathvista: Evaluating mathematical reasoning of foundation models in visual contexts",
+            "journal": "",
+            "year": "2024",
+            "authors": "Pan Lu; Hritik Bansal; Tony Xia; Jiacheng Liu; Chunyuan Li; Hannaneh Hajishirzi; Hao Cheng; Kai-Wei Chang; Michel Galley; Jianfeng Gao"
+        },
+        {
+            "ref_id": "b30",
+            "title": "SCITAB: A challenging benchmark for compositional reasoning and claim verification on scientific tables",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Xinyuan Lu; Liangming Pan; Qian Liu; Preslav Nakov; Min-Yen Kan"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Ex-fever: A dataset for multi-hop explainable fact verification",
+            "journal": "",
+            "year": "2024",
+            "authors": "Huanhuan Ma; Weizhi Xu; Yifan Wei; Liuji Chen; Liang Wang; Qiang Liu; Shu Wu; Liang Wang"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Www'18 open challenge: Financial opinion mining and question answering",
+            "journal": "",
+            "year": "2018",
+            "authors": "Macedo Maia; Siegfried Handschuh; André Freitas; Brian Davis; Ross Mcdermott; Manel Zarrouk; Alexandra Balahur"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Good debt or bad debt: Detecting semantic orientations in economic texts",
+            "journal": "AI Meta",
+            "year": "2013",
+            "authors": "Pekka Malo; Ankur Sinha; Pyry Takala; Pekka Korhonen; Jyrki Wallenius"
+        },
+        {
+            "ref_id": "b34",
+            "title": "ECT-Sum: A new benchmark dataset for bullet point summarization of long earnings call transcripts",
+            "journal": "",
+            "year": "2022",
+            "authors": "Rajdeep Mukherjee; Abhinav Bohra; Akash Banerjee; Soumya Sharma; Manjunath Hegde; Afreen Shaikh; Shivani Shrivastava; Koustuv Dasgupta; Niloy Ganguly; Saptarshi Ghosh; Pawan Goyal"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Chatgpt: Optimizing language models for dialogue",
+            "journal": "",
+            "year": "2022",
+            "authors": " Openai"
+        },
+        {
+            "ref_id": "b36",
+            "title": "OpenAI. 2023a. Gpt-4 technical report",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b37",
+            "title": "2023b. GPT-4V(ision) system card",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b38",
+            "title": "Fin-fact: A benchmark dataset for multimodal financial fact checking and explanation generation",
+            "journal": "",
+            "year": "2024",
+            "authors": "Aman Rangapur; Haoran Wang; Ling Jian; Kai Shu"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Benchmarking the generation of fact checking explanations",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Daniel Russo; Serra Sinem Tekiroglu; Marco Guerini"
+        },
+        {
+            "ref_id": "b40",
+            "title": "Domain adaption of named entity recognition to support credit risk assessment",
+            "journal": "",
+            "year": "2015",
+            "authors": "Julio Cesar; Salinas Alvarado; Karin Verspoor; Timothy Baldwin"
+        },
+        {
+            "ref_id": "b41",
+            "title": "Finer: Financial named entity recognition dataset and weak-supervision model",
+            "journal": "",
+            "year": "2023",
+            "authors": "Agam Shah; Ruchit Vithani; Abhinav Gullapalli; Sudheer Chava"
+        },
+        {
+            "ref_id": "b42",
+            "title": "Detecting pretraining data from large language models",
+            "journal": "",
+            "year": "2024",
+            "authors": "Weijia Shi; Anirudh Ajith; Mengzhou Xia; Yangsibo Huang; Daogao Liu; Terra Blevins; Danqi Chen; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b43",
+            "title": "Accurate stock movement prediction with self-supervised learning from sparse noisy tweets",
+            "journal": "",
+            "year": "2022",
+            "authors": "Yejun Soun; Jaemin Yoo; Minyong Cho; Jihyeong Jeon;  Kang"
+        },
+        {
+            "ref_id": "b44",
+            "title": "Minicheck: Efficient fact-checking of llms on grounding documents",
+            "journal": "",
+            "year": "2024",
+            "authors": "Liyan Tang; Philippe Laban; Greg Durrett"
+        },
+        {
+            "ref_id": "b45",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "Gemma Team; Thomas Mesnard; Cassidy Hardin; Robert Dadashi; Surya Bhupatiraju; Shreya Pathak; Laurent Sifre; Morgane Rivière; Mihir Sanjay Kale; Juliette Love; Pouya Tafti; Léonard Hussenot"
+        },
+        {
+            "ref_id": "b46",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "Aditya Roberts; Alex Barua; Alex Botev; Ambrose Castro-Ros; Amélie Slone; Andrea Héliou; Anna Tacchetti; Antonia Bulanova; Beth Paterson; Bobak Tsai; Charline Le Shahriari; Christopher A Lan; Clément Choquette-Choo; Daniel Crepy; Daphne Cer; David Ippolito; Elena Reid; Eric Buchatskaya; Eric Ni; Geng Noland; George Yan; George-Christian Tucker; Grigory Muraru; Henryk Rozhdestvenskiy; Ian Michalewski; Ivan Tenney; Jacob Grishchenko; James Austin; Jane Keeling; Jean-Baptiste Labanowski; Jeff Lespiau; Jenny Stanway; Jeremy Brennan; Johan Chen; Justin Ferret; Justin Chiu; Katherine Mao-Jones; Kathy Lee; Katie Yu; Lars Lowe Millican; Lisa Sjoesund; Lucas Lee; Machel Dixon; Maciej Reid; Mateo Mikuła; Michael Wirth; Nikolai Sharman; Nithum Chinaev; Olivier Thain; Oscar Bachem; Oscar Chang; Paige Wahltinez; Paul Bailey; Petko Michel; Rahma Yotov; Ramona Chaabouni; Reena Comanescu; Rohan Jana; Ross Anil; Ruibo Mcilroy; Ryan Liu;  Mullins; L Samuel; Sebastian Smith; Sertan Borgeaud; Sholto Girgin; Shree Douglas; Siamak Pandya; Soham Shakeri; Ted De; Tom Klimenko; Vlad Hennigan; Wojciech Feinberg; Yu Stokowiec; Zafarali Hui Chen; Zhitao Ahmed; Tris Gong; Ludovic Warkentin; Minh Peran; Clément Giang; Oriol Farabet; Jeff Vinyals; Koray Dean; Demis Kavukcuoglu; Zoubin Hassabis; Douglas Ghahramani; Joelle Eck; Fernando Barral; Eli Pereira; Armand Collins;  Joulin"
+        },
+        {
+            "ref_id": "b47",
+            "title": "FEVER: a large-scale dataset for fact extraction and VERification",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "James Thorne; Andreas Vlachos; Christos Christodoulopoulos; Arpit Mittal"
+        },
+        {
+            "ref_id": "b48",
+            "title": "Igor Molybog",
+            "journal": "Aurelien Rodriguez",
+            "year": "",
+            "authors": "Hugo Touvron; Louis Martin; Kevin Stone; Peter Albert; Amjad Almahairi; Yasmine Babaei; Nikolay Bashlykov; Soumya Batra; Prajjwal Bhargava; Shruti Bhosale; Dan Bikel; Lukas Blecher; Cristian Canton Ferrer; Moya Chen; Guillem Cucurull; David Esiobu; Jude Fernandes; Jeremy Fu; Wenyin Fu; Brian Fuller; Cynthia Gao; Vedanuj Goswami; Naman Goyal; Anthony Hartshorn; Saghar Hosseini; Rui Hou; Hakan Inan; Marcin Kardas; Viktor Kerkez; Madian Khabsa; Isabel Kloumann; Artem Korenev; Punit Singh Koura; Marie-Anne Lachaux; Thibaut Lavril; Jenya Lee; Diana Liskovich; Yinghai Lu; Yuning Mao; Xavier Martinet; Todor Mihaylov; Pushkar Mishra"
+        },
+        {
+            "ref_id": "b49",
+            "title": "",
+            "journal": "Angela Fan",
+            "year": "",
+            "authors": "Hugo Touvron; Louis Martin; Kevin R Stone; Peter Albert; Amjad Almahairi; Yasmine Babaei; Nikolay Bashlykov; Soumya Batra; Prajjwal Bhargava; Shruti Bhosale; Daniel M Bikel; Lukas Blecher; Cristian Canton Ferrer; Moya Chen; Guillem Cucurull; David Esiobu; Jude Fernandes; Jeremy Fu; Wenyin Fu; Brian Fuller; Cynthia Gao; Vedanuj Goswami; Naman Goyal; Anthony S Hartshorn; Saghar Hosseini; Rui Hou; Hakan Inan; Marcin Kardas; Viktor Kerkez; Madian Khabsa; Isabel M Kloumann; A V Korenev; Punit Singh Koura; Marie-Anne Lachaux; Thibaut Lavril; Jenya Lee; Diana Liskovich; Yinghai Lu; Yuning Mao; Xavier Martinet; Todor Mihaylov; Pushkar Mishra; Igor Molybog; Yixin Nie; Andrew Poulton; Jeremy Reizenstein; Rashi Rungta; Kalyan Saladi; Alan Schelten; Ruan Silva; Eric Michael Smith; R Subramanian; Xia Tan; Binh Tang; Ross Taylor; Adina Williams; Jian Xiang Kuan; Puxin Xu; Zhengxu Yan; Iliyan Zarov; Yuchen Zhang"
+        },
+        {
+            "ref_id": "b50",
+            "title": "Fact checking: Task definition and dataset construction",
+            "journal": "Association for Computational Linguistics",
+            "year": "2014",
+            "authors": "Andreas Vlachos; Sebastian Riedel"
+        },
+        {
+            "ref_id": "b51",
+            "title": "Fact or fiction: Verifying scientific claims",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "David Wadden; Shanchuan Lin; Kyle Lo; Lucy Lu Wang; Madeleine Van Zuylen; Arman Cohan; Hannaneh Hajishirzi"
+        },
+        {
+            "ref_id": "b52",
+            "title": "SciFact-open: Towards open-domain scientific claim verification",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "David Wadden; Kyle Lo; Bailey Kuehl; Arman Cohan; Iz Beltagy; Lucy Lu Wang; Hannaneh Hajishirzi"
+        },
+        {
+            "ref_id": "b53",
+            "title": "Chain of thought prompting elicits reasoning in large language models",
+            "journal": "",
+            "year": "2022",
+            "authors": "Jason Wei; Xuezhi Wang; Dale Schuurmans; Maarten Bosma; Fei Xia; Ed H Chi; Denny Quoc V Le;  Zhou"
+        },
+        {
+            "ref_id": "b54",
+            "title": "Hybrid deep sequential modeling for social text-driven stock prediction",
+            "journal": "Association for Computing Machinery",
+            "year": "2018",
+            "authors": "Huizhe Wu; Wei Zhang; Weiwei Shen; Jun Wang"
+        },
+        {
+            "ref_id": "b55",
+            "title": "Bloomberggpt: A large language model for finance",
+            "journal": "",
+            "year": "2023",
+            "authors": "Shijie Wu; Ozan Irsoy; Steven Lu; Vadim Dabravolski; Mark Dredze; Sebastian Gehrmann; Prabhanjan Kambadur; David Rosenberg; Gideon Mann"
+        },
+        {
+            "ref_id": "b56",
+            "title": "Pixiu: A large language model, instruction data and evaluation benchmark for finance",
+            "journal": "",
+            "year": "2023",
+            "authors": "Qianqian Xie; Weiguang Han; Xiao Zhang; Yanzhao Lai; Min Peng; Alejandro Lopez-Lira; Jimin Huang"
+        },
+        {
+            "ref_id": "b57",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "Qianqian Xie; Dong Li; Mengxi Xiao; Zihao Jiang; Ruoyu Xiang; Xiao Zhang; Zhengyu Chen; Yueru He; Weiguang Han; Yuzhe Yang; Shunian Chen; Yifei Zhang; Lihang Shen; Daniel Kim; Zhiwei Liu; Zheheng Luo; Yangyang Yu; Yupeng Cao; Zhiyang Deng; Zhiyuan Yao; Haohang Li; Duanyu Feng; Yongfu Dai; Vijayasai Somasundaram; Peng Lu; Yilun Zhao; Yitao Long; Guojun Xiong; Kaleb Smith; Honghai Yu; Yanzhao Lai; Min Peng; Jianyun Nie; Jordan W Suchow; Xiao-Yang Liu; Benyou Wang; Alejandro Lopez-Lira; Jimin Huang"
+        },
+        {
+            "ref_id": "b58",
+            "title": "Stock movement prediction from tweets and historical prices",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018",
+            "authors": "Yumo Xu; Shay B Cohen"
+        },
+        {
+            "ref_id": "b59",
+            "title": "Fingpt: Open-source financial large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Hongyang Yang; Xiao-Yang Liu; Christina Dan Wang"
+        },
+        {
+            "ref_id": "b60",
+            "title": "DocNLI: A large-scale dataset for documentlevel natural language inference",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Wenpeng Yin; Dragomir Radev; Caiming Xiong"
+        },
+        {
+            "ref_id": "b61",
+            "title": "MultiHiertt: Numerical reasoning over multi hierarchical tabular and textual data",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Yilun Zhao; Yunxiang Li; Chenying Li; Rui Zhang"
+        },
+        {
+            "ref_id": "b62",
+            "title": "2024a. Financemath: Knowledge-intensive math reasoning in finance domains",
+            "journal": "Association for Computational Linguistics",
+            "year": "",
+            "authors": "Yilun Zhao; Hongjun Liu; Yitao Long; Rui Zhang; Chen Zhao; Arman Cohan"
+        },
+        {
+            "ref_id": "b63",
+            "title": "Xiangru Tang, Rui Zhang, and Arman Cohan. 2024b. DocMath-eval: Evaluating math reasoning capabilities of LLMs in understanding long and specialized documents",
+            "journal": "Association for Computational Linguistics",
+            "year": "",
+            "authors": "Yilun Zhao; Yitao Long; Hongjun Liu; Ryo Kamoi; Linyong Nan; Lyuhao Chen; Yixin Liu"
+        },
+        {
+            "ref_id": "b64",
+            "title": "Xiangru Tang, Rui Zhang, and Arman Cohan. 2023a. Docmath-eval: Evaluating numerical reasoning capabilities of llms in understanding long documents with tabular data",
+            "journal": "",
+            "year": "",
+            "authors": "Yilun Zhao; Yitao Long; Hongjun Liu; Linyong Nan; Lyuhao Chen; Ryo Kamoi; Yixin Liu"
+        },
+        {
+            "ref_id": "b65",
+            "title": "Dragomir Radev, and Arman Cohan. 2023b. QTSumm: Query-focused summarization over tabular data",
+            "journal": "",
+            "year": "",
+            "authors": "Yilun Zhao; Zhenting Qi; Linyong Nan; Boyu Mi; Yixin Liu; Weijin Zou; Simeng Han; Ruizhe Chen; Xiangru Tang; Yumo Xu"
+        },
+        {
+            "ref_id": "b66",
+            "title": "Xiangru Tang, and Arman Cohan. 2023c. Investigating table-to-text generation capabilities of large language models in real-world information seeking scenarios",
+            "journal": "",
+            "year": "",
+            "authors": "Yilun Zhao; Haowei Zhang; Shengyun Si; Linyong Nan"
+        },
+        {
+            "ref_id": "b67",
+            "title": "RobuT: A systematic study of table QA robustness against human-annotated adversarial perturbations",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yilun Zhao; Chen Zhao; Linyong Nan; Zhenting Qi; Wenlin Zhang; Xiangru Tang; Boyu Mi; Dragomir Radev"
+        },
+        {
+            "ref_id": "b68",
+            "title": "Judging LLM-as-a-judge with MT-bench and chatbot arena",
+            "journal": "",
+            "year": "2023",
+            "authors": "Lianmin Zheng; Wei-Lin Chiang; Ying Sheng; Siyuan Zhuang; Zhanghao Wu; Yonghao Zhuang; Zi Lin; Zhuohan Li; Dacheng Li; Eric Xing; Hao Zhang; Joseph E Gonzalez; Ion Stoica"
+        },
+        {
+            "ref_id": "b69",
+            "title": "Trade the event: Corporate events detection for news-based event-driven trading",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Zhihan Zhou; Liqian Ma; Han Liu"
+        },
+        {
+            "ref_id": "b70",
+            "title": "TAT-QA: A question answering benchmark on a hybrid of tabular and textual content in finance",
+            "journal": "Online. Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Fengbin Zhu; Wenqiang Lei; Youcheng Huang; Chao Wang; Shuo Zhang; Jiancheng Lv; Fuli Feng; Tat-Seng Chua"
+        },
+        {
+            "ref_id": "b71",
+            "title": "(Meta, 2024) Meta 2024-04 8k meta-llama/Meta-Llama-3-*-Instruct Yi-1",
+            "journal": "",
+            "year": "2023",
+            "authors": " Touvron"
+        },
+        {
+            "ref_id": "b72",
+            "title": "InternLM2 (Team, 2024) internlm 2024-01 200k internlm/internlm2-chat-* GLM",
+            "journal": "",
+            "year": "2022",
+            "authors": " Du"
+        },
+        {
+            "ref_id": "b73",
+            "title": "microsoft 2024-04 128k microsoft/Phi-3-*-instruct Table 8: Details of the organization, release time, maximum context length, and model source (i.e., url for proprietary models and Huggingface model name for open-source models) for the LLMs evaluated in FINDVER",
+            "journal": "",
+            "year": "2024",
+            "authors": " Phi ; Abdin"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 2 :2Figure 2: An overview of FINDVER construction pipeline.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 3 :3Figure 3: The Chain-of-Thought prompt used.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "(1) Extraction error: The model fails to correctly retrieve relevant information from the context, resulting in inaccurate verification. (2) Numerical reasoning error: The model encounters difficulties with correct mathematical reasoning. (3) Domain knowledge deficiency: The model lacks sufficient knowledge in finance-related areas, which hampers its ability to reason accurately. (4) Computation error: While the model's reasoning is correct, it makes computational mistakes during intermediate or final steps, resulting in incorrect verification.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Human evaluation over 100 samples from the FINDVER testmini set. Two internal evaluators were asked to rate the samples on a scale of 1 to 5 individually. We report percent of samples that have an average score ≥ 4 to indicate the annotation quality of FINDVER.",
+            "figure_data": "Annotation Quality Claim Fluency Meaningfulness Alignment with real-world scenarios%S ≥ 4 92 90 94Evidence Relevancy Completeness89 85Reasoning-process Explanation Fluency Correctness Comprehensiveness95 92 90Entailment Label Correctness94"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": ", Llama-",
+            "figure_data": "PropertyFDV-IEFDV-MATHFDV-KNOWReal-world scenarios in financial domainsinformation extractionnumerical reasoningknowledge-intensive reasoning# Document221225217Doc Length (i.e., word count) (Median/Avg/Max)42K / 41K / 71K43K / 41K / 71K43K / 41K / 71K# Tables per document (Median/Avg)62 / 78.962 / 79.162 / 79.0Claim length (Median/Avg)47 / 47.224 / 25.136 / 37.1# Text evidence per claim (Median/Avg)2 / 1.81 / 1.33 / 2.6# Table evidence per claim (Median/Avg)1 / 1.01 / 0.91 / 1.2% Claims w. table evidence66.3%71.1%70.8%Explanation length (Median/Avg)70 / 73.174 / 76.296 / 100.7Benchmark size (# Claims)testmini size200200200test size500500500"
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "Basic statistics of the FINDVER benchmark.",
+            "figure_data": "Adopted Chain-of-Thought Prompt[System Input] As a financial expert, your task is to assess the truthfulness of the given claim by determining whether it is entailed or refuted based on the provided financial document. Follow these steps: 1. Carefully read the given context and the claim. 2. Analyze the document, focusing on the relevant financial data or facts that related to the claim. 3. Document each step of your reasoning process to ensure your assessment is clear and thorough. 4. Conclude your analysis with a final determination. In your last sentence, clearly state your conclusion in the following format: \"Therefore, the claim is {entailment_label}.\" Replace {entailment_label} with either 'entailed' (if the claim is supported by the document) or 'refuted' (if the claim contradicts or partially contradicts the document).[User Input] Financial Report: {Financial Report}Claim to verify: {Claim}Follow the instructions and think step by step to verify the claim."
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "Accuracy of entailment classification on the testmini set of FINDVER. We report results for LLMs with CoT prompting under the long-context (LongC) and RAG settings. Numbers underscored indicate that models under the long-context setting achieve better results than under the RAG setting.",
+            "figure_data": "ModelNotesFDV-IE LongC RAG LongC RAG LongC RAG LongC RAG FDV-MATH FDV-KNOW AverageRandom Choice50.050.050.050.0Human Non-Expert90.085.085.086.7Human Expert95.090.095.093.3Open-source LLMsInternLM2-Math-7b Math-58.0-53.5-54.5-55.3InternLM2-7B-59.5-54.5-56.0-56.7Gemma-7B-59.5-55.5-55.0-56.7GLM-4-9b58.561.054.554.555.056.556.057.3Llama-2-7B-60.0-56.5-56.5-57.7Mistral-7B-v3-59.5-56.5-57.0-57.7Phi-3-medium-4k-61.5-54.0-58.0-57.8Llama-2-70B-61.5-54.5-58.0-58.0Phi-3-medium-128k58.061.554.055.556.557.556.258.2Meta-Llama-3-8B-62.5-55.0-59.5-59.0Yi-1.5-34B-62.5-58.0-58.0-59.5Meta-Llama-3-70BMoE-65.5-61.5-61.5-62.8C4AI Command R+-67.5-60.0-64.5-64.0Qwen2-72B67.068.062.561.560.565.063.364.8Mixtral-8x22B-70.0-62.0-67.0-66.3Proprietary LLMsGemini-1.5-Flash71.070.562.560.565.065.566.265.5GPT-3.5-turbo-79.0-64.0-70.5-71.2GPT-4o80.078.570.568.076.574.575.773.7Claude-3.5-Sonnet83.580.571.069.077.075.577.275.0involves distinguishing headers and cells in differ-ent columns using a vertical bar (|) and separatingrows with new lines. This format allows us to in-put flattened table data directly into LLMs. In ourinitial experiments, we found that LLMs such asGPT-* and Llama-3 can effectively interpret thistable representation. However, we suggest that fu-ture studies should investigate more sophisticatedmethods for encoding tabular data to enhance com-prehension by LLMs."
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "Table 5 display the primary results for FINDVER. We reveals a significant accuracy gap between human experts and LLMs. Notably,",
+            "figure_data": "ModelIEMATH KNOW AvgHuman Non-Expert Human Expert90.0 95.085.0 90.085.0 95.086.7 93.3Open-source LLMsInternLM2-Math-7B 57.0 InternLM2-7B 59.6 Gemma-7B 59.8 GLM-4-9B 61.4 Llama-2-7B 61.0 Mistral-7B-v3 59.8 Phi-3-medium-4k 61.8 Llama-2-70B 60.6 Phi-3-medium-128k 61.2 Meta-Llama-3-8B 63.4 Yi-1.5-34B 62.8 Meta-Llama-3-70B 65.0 C4AI Command R+ 67.4 Qwen2-72B 69.0 Mixtral-8x22B 71.053.8 53.4 54.4 54.2 57.2 56.0 54.0 53.8 55.4 55.0 57.2 61.2 59.0 62.2 62.854.6 55.4 55.0 57.4 57.2 56.4 57.2 58.0 58.2 60.2 56.8 60.4 65.4 65.2 68.255.1 56.1 56.4 57.7 58.5 57.4 57.7 57.5 58.3 59.5 58.9 62.2 63.9 65.5 67.3Proprietary LLMsGemini-1.5-Flash GPT-3.5-turbo GPT-4o Claude-3.5-Sonnet71.2 79.6 78.6 81.061.0 65.2 69.4 68.265.8 70.8 73.8 74.066.0 71.9 73.9 74.4"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "Accuracy of entailment classification on the FINDVER test set. We report results for LLMs with CoT prompting under the RAG setting. Due to computation constraint, we did not evaluate the long-context setting.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_8",
+            "figure_caption": "both LLMs' per-As a financial expert, your task is to assess the truthfulness of the given statement by determining whether it is entailed or refuted based on the provided financial document. You should directly output the entailment label ('entailed' or 'refuted') without any intermediate steps.",
+            "figure_data": "Adopted Chain-of-Thought Prompt[System Input][User Input] Financial Report: {Financial Report}Claim to verify: {Claim}Directly output the entailment label ('entailed' or 'refuted') of the claim.Figure 4: The Direct Output prompt used.Modelw/o CoT LongC RAGw/ CoT LongC RAGQwen2-72B 57.7 (-5.6) 59.5 (-5.3) 63.3 GPT-4o 70.1 (-7.1) 69.5 (-5.5) 77.264.8 75.0"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "Accuracy of entailment for GPT-4o and Qwen2-72B with and without CoT Prompting methods on the FINDVER testmini set.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "ℓ = arg max ℓ∈L P LLM (ℓ | P, T, c)(1)",
+            "formula_coordinates": [
+                3.0,
+                345.25,
+                484.4,
+                179.91,
+                20.55
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "e P LLM (e | P, T, c)(2)",
+            "formula_coordinates": [
+                3.0,
+                389.68,
+                567.03,
+                135.47,
+                20.55
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/2022.findings-naacl.1"
+}

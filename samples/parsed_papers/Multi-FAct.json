@@ -1,0 +1,647 @@
+{
+    "title": "Multi-FAct: Assessing Factuality of Multilingual LLMs using FActScore",
+    "caption": "The Pipieline of Multi-FAct",
+    "authors": "Shafayat Sheikh; Eunsu Kim; Juhyun Oh; Alice Oh",
+    "pub_date": "",
+    "abstract": "Evaluating the factuality of long-form large language model (LLM)generated text is an important challenge. Recently there has been a surge of interest in factuality evaluation for English, but little is known about the factuality evaluation of multilingual LLMs, specially when it comes to longform generation. We introduce a simple pipeline for multilingual factuality evaluation, by applying FActScore (Min et al., 2023) for diverse languages. In addition to evaluating multilingual factual generation, we evaluate the factual accuracy of long-form text generation in topics that reflect regional diversity. We also examine the feasibility of running the FActScore pipeline using non-English Wikipedia and provide comprehensive guidelines on multilingual factual evaluation for regionally diverse topics.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": "Large Language Models (LLMs) are susceptible to factuality hallucination, a phenomenon in which the generated text contradicts established world knowledge (Huang et al., 2023;Zhang et al., 2023). Despite extensive research focusing on hallucination and factuality of LLMs in free-form generation, the previous works have predominantly studied English (Huang et al., 2023;Min et al., 2023;Mishra et al., 2024;Wei et al., 2024;Wang et al., 2023). Consequently, there exists a wide gap in our comprehension of the factual accuracy of LLMs when producing content in non-English languages. As highlighted by Kang et al. (2024), current metrics for detecting hallucination are inadequate in multilingual settings. The extent to which LLMs exhibit factual hallucination remains unclear across different languages. Similar to other capabilities, there may be a discernible decline in performance when LLMs are tasked with non-English contexts (Ahuja et al., 2023;Bang et al., 2023).\nIn this paper, we address this gap by systematically evaluating the factual accuracy of multilingual LLMs across different languages and geographic regions. We explore the following research questions: R1: How can we effectively evaluate the factuality of multilingual LLMs in free-form text generation? R2: How do multilingual models' free-form answers compare in factual accuracy across languages and geographically contextualized questions?\nTo address these questions, we introduce Multi-FAct , a simple pipeline tailored for evaluating factuality in a multilingual context. Leveraging open-source models, we adapt the FActScore (Min et al., 2023) for multiple languages and validate it using human annotations from Min et al. (2023). Furthermore, we explore the use of non-English Wikipedia content to augment factuality evaluation, finding that while English Wikipedia remains a reliable source, concatenating articles from multiple non-English languages can sometimes provide estimates close to English Wikipedia.\nWe conduct an evaluation of the factual accuracy of recent proprietary multilingual LLMs in nine languages using biography generation task. We ensure geographical diversity by curating subjects from various regions. Our analysis reveals two significant findings. First, English consistently maintains an advantage in both factual accuracy and the quantity of generated facts compared to other languages. Second, content produced by multilingual language models exhibits better factual accuracy about North America and Europe across the languages.\nOur contributions are as follows:\n• We propose a novel pipeline Multi-FAct , that applies FActScore in a multilingual setting, and demonstrates the feasibility of conducting factuality evaluation of long-form generation in the multilingual biography task.\n• We explore the potential and limitations of using non-English resources, particularly non-English Wikipedia articles, for factuality evaluation of long-form generation, showing that reasonably large non-English Wikipedia articles can also serve as a viable source.\n• We introduce Multi-FAct as a tool to investigate cultural and geographic biases in LLMs, offering insights into how these biases manifest in LLM generated content.",
+            "publication_ref": [
+                "b30",
+                "b21",
+                "b23",
+                "b28",
+                "b27",
+                "b17",
+                "b1",
+                "b3",
+                "b21",
+                "b21"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "LLM Factuality Evaluation",
+            "text": "The assessment of factual accuracy in natural language texts predates the advent of LLMs (Guo et al., 2022). Our Multi-FAct pipeline follows the previous fact evaluation research, which involves validating claims based on external resource such as Wikipedia article (Thorne et al., 2018;Krishna et al., 2022;Zhong et al., 2019) or Google search (Chern et al., 2023;Wei et al., 2024). Our work is inspired by and based on Min et al. (2023) which proposes FActScore to measure the factuality of a long-form generated output of LLMs by breaking it down into atomic facts. Another line of work focuses on evaluating factual accuracy solely based on model output or internal states, eliminating the need for external knowledge bases like Wikipedia (Manakul et al., 2023;Azaria & Mitchell, 2023;Dhuliawala et al., 2023). While such methods offer resource efficiency, they often sacrifice accuracy compared to approaches leveraging external resources for factuality evaluation.",
+            "publication_ref": [
+                "b8",
+                "b26",
+                "b18",
+                "b31",
+                "b6",
+                "b28",
+                "b21",
+                "b19",
+                "b2",
+                "b7"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Multilingual Factuality Evaluation",
+            "text": "To evaluate factual accuracy of multilingual generation, Gupta & Srikumar (2021) presents the X-Fact dataset. Similarly, Thorne et al. (2018) presents frameworks for multilingual fact-extraction and verification evaluation. Additionally, Aharoni et al. (2022) introduces mFACE, a dataset aimed at evaluating multilingual factual consistency. While these papers advance the understanding of multilingual factuality, they focus on the assessment of factual accuracy in existing articles or benchmarks rather than examining the factual accuracy in the long-form generation of LLMs. Recently, Kang et al. (2024) explores the efficacy of existing metrics designed to detect hallucinations of LLM-generations in English in a multilingual setting, showing that the English-based metrics fall short in multilingual contexts. Our study extends the endeavor of developing a factuality evaluation metric that can be applied in multiple languages by introducing a Multi-Fact pipeline.\nGeo-culture biases of LLMs Research shows LLMs exhibit cultural and linguistic bias (Hovy & Yang, 2021;Cao et al., 2023;Hershcovich et al., 2022;Huang & Yang, 2023;Jin et al., 2023;Naous et al., 2023). A recent paper conducts a true-false evaluation task that shows GPT models are more accurate for facts about the Global North compared to the Global South (Mirza et al., 2024), consistent with our findings. We conduct a much more comprehensive study with long-form generation of geographically diverse information in multiple languages.",
+            "publication_ref": [
+                "b9",
+                "b26",
+                "b0",
+                "b17",
+                "b11",
+                "b4",
+                "b10",
+                "b12",
+                "b16",
+                "b24",
+                "b22"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Multi-FAct Pipeline",
+            "text": "We introduce Multi-FAct, a novel pipeline for automatically measuring factuality of a multilingual LLM in a multilingual setting. Multi-FAct evaluates the biographies of multiregional topics in multiple languages. We choose the biography generation task because biographies are suitable for being decomposed into verifiable and independent \"atomic\" facts (Min et al. (2023)).\nThe Multi-FAct pipeline is structured into three main steps: 1) Obtaining multilingual generations ( § 3.1), 2) Translating these facts into English using GPT-3.5 ( § 3.2), and 3) Measuring factuality of the translated facts ( § 3.3).",
+            "publication_ref": [
+                "b21"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Generating Facts",
+            "text": "Model Most of the results in this paper use GPT4 (gpt-4-1106-preview) and GPT3.5 (gpt-3.5-turbo-0613) models because at the time of writing this paper, those were the only two strong multilingual models1 for LLM multilingual biography generation. All experiments are conducted between January and March 20242 , and the model temperatures are set to their defaults for respective models.\nLanguage We choose a total of nine languages: English, German, French, Spanish, Arabic, Swahili, Chinese, Korean, and Bengali. We carefully choose languages to represent the level of existing resources-high, medium, and low, and to represent diverse regions-Africa, Europe, Asia, and America3 .\nPrompt We use the following prompt: Write a biography of {name}. We translate the prompt with GPT-4 into the eight non-English langauges, then we ask the native speakers to verify the translation. We also transliterate each person's name into corresponding languages either using Wikipedia crosslinking or GPT-4, of which we take a subset and the native speakers verify that almost all the transliterations are correct.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Translating Generated Facts",
+            "text": "To compare the biographies written in the eight non-English languages, we translate the generated content from the original languages to English using gpt-3.5-turbo-0125. We do not use commercially available machine translation systems, such as Google Translate, based on the preliminary result that they do not maintain the consistent gender of the person throughout the text4 .\nWe translate the generation and verify facts in English, rather than doing fact verification in corresponding languages with respective Wikipedia articles for multiple reasons. First, Wikipedia differs in size and scope for each language (Wikipedia contributors, 2024), which makes it difficult to compare cross-lingual factuality if the knowledge base is different.\nAdditionally, key components of the original FActScore pipeline, such as RAG and NPM, are optimized for English and not available in other languages. Our quantitative analysis of LLM-based translation's impact on FActScore evaluation reveals that GPT-3.5's translation minimally influences the FActScore of texts (See § 3.4).",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Measuring Factuality",
+            "text": "To evaluate the accuracy of the generated model's response M, we use the FActScore metric. This involves breaking down the translated generation into atomic facts-short sentences, each conveying a single piece of information, as defined in Min et al. (2023). We denote the set of atomic facts as A, and we measure the accuracy of these atomic facts with the corresponding English Wikipedia article serving as the reference knowledge source C.\n# of Correct Facts(M) = 1(a is supported by C) FActScore (M) = 1 |A| ∑ a∈A # of Correct Facts(M)(1)\nWe replace all proprietary models of the original FActScore pipeline with open-source models, ensuring cost-effectiveness while maintaining the quality of our system. We decompose LLM responses M into atomic facts using Mistral-7B Jiang et al. ( 2023). The verification step also uses Mistral-7B along with RAG and NPM for the best performance. We set the NPM threshold at 0.3.",
+            "publication_ref": [
+                "b21"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Reliability of Multi-FAct",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Replication of original FActScore",
+            "text": "We conduct a comparative analysis using our implementation, which includes a Mistral 7B model, instead of InstructGPT for atomic break-down, against the outcomes presented in the Min et al. (2023), using a subset of human-annotated factual data generated by ChatGPT (See Table 1). A comparison with other baselines and different parts of the Multi-FAct pipeline for different languages is provided in appendix A.",
+            "publication_ref": [
+                "b21"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0"
+            ]
+        },
+        {
+            "heading": "Metric Human FS FS (ours) Error Value",
+            "text": "0.626 ± 0.238 0.640 ± 0.127 -0.014 ± 0.128  2023) as this value is averaged over our subset (44 samples).",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Effect of GPT-3.5 Translation in Multi-FAct",
+            "text": "As our pipeline crucially relies on the GPT-3.5 translation (Step 3 in figure 1), it is imperative to check whether the translation step affects the automated estimation of FActScore in the multilingual setting. We evaluate the effect of GPT-3.5 translation based on the premise that the factual content of a text should remain consistent across translations into different languages. In other words, if the factuality of an English text is established, its translated version in another language should exhibit the same level of factuality. To simulate and test the reliability of Multi-FAct with respect to translation, we first take the human-annotated examples provided in the original work (Min et al., 2023) and translate them into the eight non-English languages using GPT-45 . Then, we apply our multilingual FActScore pipeline (Figure 1) on the translated texts6 . Table 2 indicates that the execution of Multi-FAct on non-English data does not significantly degrade the estimation of FActScore, and the correlation between FActScore in different languages and human evaluation remains comparable. This outcome implies that adding a translation step to our pipeline does not significantly influence the estimation of FActScore .",
+            "publication_ref": [
+                "b21"
+            ],
+            "figure_ref": [
+                "fig_0",
+                "fig_0"
+            ],
+            "table_ref": [
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "Language Correlation",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Reference Sources in Multilingual Factuality Evaluation",
+            "text": "We evaluate the factual accuracy of LLM-generated biographies against English Wikipedia for its reliability and comprehensive coverage of information about individuals, following prior works (Petroni et al., 2020;Chen et al., 2017;Min et al., 2023). However, we need to analyze the reliability of non-English Wikipedia articles as references. While the Multi-FAct pipeline is effective for topics with established English Wikipedia articles, its applicability may be limited because many regional topics (e.g., local politicians) lack English Wikipedia articles. If we cannot extend our Multi-FAct pipeline to these topics, it would be a major obstacle to ensuring LLM factuality with geographical diversity. However, as figure 2 illustrates, languages included in our study exhibit a wide range of variability in their representation within Wikipedia.\nIn this section, we explore the following question: How should we measure multilingual factuality, when we cannot find a sufficient golden source of reference in English? First, we examine whether simple translation of Wikipedia articles from languages other than English would sustain the quality ( § 4.1). Then, we reveal that the \"length of articles\" is one factor contributing to performance degradation when non-English Wikipedia is used as fact verification ground truth corpus, and we propose a new method of concatenating articles from different languages to enhance the comprehensiveness of the reference ( § 4.2).  Figure 3: Effect of using non-English Wikipedia as knowledge corpus for FActScore estimation. The x-axis in subfigure 3b represents the word count (in English) after translation. As the length of the non-English Wikipedia article increases, its utility for evaluating factuality increases.",
+            "publication_ref": [
+                "b25",
+                "b5",
+                "b21"
+            ],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Using Translated Wikipedia Articles as Reference",
+            "text": "We first test whether we can simply translate the Wikipedia articles written in eight non-English languages into English then replace the English Wikipedia articles within Multi-FAct pipeline with the translations. Using GPT-3.5, we translate the respective Wikipedia articles into English and conduct factual evaluation in English. We chose 157 individuals as topics for whom human-annotated data exists in Min et al. (2023), which served as the ground truth. We then compare this ground truth with the experimental results.\nFigure 3a illustrates the errors for each language's Wikipedia against ground truth, and we include English Wikipedia corpus as the baseline. The results show a near-zero error rate for English, and lower error rates in French, Spanish, and German. We observe relatively higher error rates for Bengali, Korean, Chinese, and Arabic. Note that the size and coverage of Wikipedia varies across languages, thus the number of samples used in the experiments also varies by language, as indicated by n in the figures.",
+            "publication_ref": [
+                "b21"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Effect of Reference Length",
+            "text": "We hypothesize that non-English Wikipedias result in higher errors compared to English Wikipedia due to the lower coverage of topics, as evidenced by the shorter length of non- Figure 4: Effect of corpus size on FActScore Estimation. Figure 4a shows that comprehensive non-English sources might be used for factuality evaluation after translating into English. English articles. Figure 3b shows that there is a linear relationship between FActScore estimation error and the word count of Wikipedia articles, indicating that longer Wikipedia articles tend to serve better as references for factuality evaluation.\nTo further test the linear relationship observed in Figure 3b, we select 100 individuals from each of our studied languages who have both English Wikipedia articles and substantially long Wikipedia articles in their regional language. 7 We generate biographies for these 100 individuals in English and evaluate these biographies against both the English Wikipedia and the Wikipedia in the corresponding regional language. Since FActScore estimation for English is nearly perfect, we use it as a benchmark to estimate the error when using non-English articles as references. Figure 4a illustrates that the linear relationship between the length of Wikipedia articles and FActScore holds for longer articles as well.\nEnsembling Wikipedia Building upon the insights about the reference length discussed in § 4.1, this section investigates whether combining multiple non-English Wikipedias, referred to as \"ensembling Wikipedias,\" can enhance the accuracy of Multi-FAct measurements. In our experiments, we explore three cases: the union of wikis from Asian languages (Asian), the union of wikis from European languages (Euro), and the union of all wikis except English (All-Eng). As depicted in the Fig 3a, among the two wikis with errors close to zero-namely, \"Euro\" and \"All-Eng\" cases-it is speculated that this could be attributed to their comprehensiveness or the high content overlap with the English Wikipedia. In the case of \"Asian,\" an error rate of 0.2 is observed, representing a decrease compared to using only one wiki of Asian language, and even approaching the performance observed for European languages (Spanish, French, and German).\nOur findings suggest that even for the same topic, the coverage of Wikipedia articles may vary across languages, thereby demonstrating that an \"ensemble Wikipedia\" comprising multiple articles can mitigate the performance gap between non-English Wikipedias and the English Wikipedia. However, the challenge of Wikipedia containing only a single, brief article remains unaddressed.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Factual Accuracy of Multilingual models",
+            "text": "We use Multi-FAct to investigate the factual accuracy of multilingual LLMs in biography generation. We select \"National Leaders of Each Country\" as the topic for factuality measurement, as it is fairly common across various cultures and languages to have well-known and well-described national leaders such as presidents and prime ministers. Specifically, we choose to focus on the president or head of state in the year 2015. This year is randomly selected from those prior to the emergence of LLMs and also to make sure that at least some amount of data about the leader is online, which might not be true for very recent leaders. The lists of countries and their corresponding leaders used in our experiments are detailed in Table 8 of Appendix.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Does factuality differ across languages?",
+            "text": "Figure 5: FActScore of GPT-3.5 and GPT-4 for each language. Note that GPT-4 makes a strong jump from GPT-3.5, especially in low-resource languages. Figure 5 illustrates the factuality across various languages using FActScore as a metric, uncovering significant variations among languages. English, Spanish, French, German, and Swahili exhibit notably higher FActScore for both GPT-3.5 and GPT-4.\nFigure 6 compares factuality across languages through the average number of correct and hallucinated facts, highlighting a significant gap in the quantity of facts generated between English and other languages. Notably, even with similar FActScore as shown in Figure 5, English surpasses other languages in generating a higher number of correct facts, thus delivering more useful responses.\nThese observations emphasize the influence of output length differences on the number of correct and hallucinated facts across languages, despite similar FActScore values. English and other high-resource languages (e.g., Chinese, Spanish) typically produce more facts due to longer outputs. In contrast, low-resource languages like Bengali yield fewer facts because of shorter responses, even when their FActScore are comparable to English (0.58 for Bengali, 0.61 for English). This discrepancy further widens the factuality gap between low-resource and high-resource languages. Hence, the denormalization of output length in multilingual contexts suggests that evaluating factuality requires considering both FActScore and the number of correct facts for a thorough assessment.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_4"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Does the Factuality Geographically Differ Across Languages?",
+            "text": "In this section, we explore whether the factuality of models varies with the geographic distribution of the language. Since GPT-4 performs better in low resource language (Figure 5), from here on, we conduct our analysis using only the outputs from GPT-4.\nTable 3 presents the overall FActScore by language and continent. Interestingly, languages with higher mean values tend to have lower standard deviations, indicating that these languages maintain a relatively uniform level of factual accuracy regardless of the geographical area. Western languages such as English, Spanish, and German notably score high across continents, while Chinese, although a high-resource language, exhibits low factual precision. Additionally, among the nine languages evaluated, six demonstrate their highest performance in content related to the American continent, highlighting a prevalent American-centric bias in GPT's knowledge across most languages.\nNext, we analyze the geographic distribution of the most factually accurate information across different languages. For each language, we identify the continents associated with  3: Overall FActScore breakdown of GPT4 by language with mean and standard deviation (STD). The continents with the highest and second-highest values for each language are emphasized in bold and underlined, respectively. Note that for all language except for Swahili, GPT4 is leaning towards American and European leaders in terms of factual accuracy.\ntop-20 FActScore . Our findings reveal a strong bias towards American and European topics across all languages studied. This pattern persists even in languages like geographicallly distant from these continents, such as Korean and Chinese. For Arabic, while the highest FActScore is linked to Africa, likely reflecting its geographical roots, American topics still rank second place. This trend highlights a Western-centric bias in the model's factual content distribution across languages. The result figure and detailed analysis of geographical biases across more fine-grained subregions are presented in Appendix D.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": "In this paper, we introduce Multi-FAct , an extension of FActScore in multilingual setting to address the critical gap in factuality evaluation for non-English free-form generation from LLMs. We empirically demonstrate the viability of conducting factuality evaluation in the multilingual biography generation task. Our approach of translating generated content and comparing it against English Wikipedia proved effective, offering a scalable method for assessing factual precision across multiple languages. Additionally, we find that sufficiently comprehensive non-English sources can serve as alternatives to English sources using the same pipeline.\nOur analysis of LLMs' outputs across different languages and geographically contextualized questions reveals a consistent advantage for English in terms of both factual accuracy and the quantity of generated facts, as well as better performance for content related to North America and Europe across languages. Multi-FAct serves as a valuable tool for investigating these biases, emphasizing the need for efforts to improve the cultural and geographic fairness of factual generations from LLMs.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": "Our work shares some of the same limitations that original FActScore faces. Throughout the whole paper, we assume English Wikipedia as the most authoritative knowledge base for fact verification. However, it is known that Wikipedia itself has a Western-centric bias Naous et al. (2023). Moreover, when combining multiple non-English Wikipedia, we do not take into account when Wikipedia articles in different languages contradict each other, which can happen for controversial topics. It is also worth noting that FActScore and Multi-FAct both do not differentiate between the informational value of facts. For example, statements like \"Person X attended MIT\" and \"Person X attended a renowned university\" are treated equally, despite the former being more specific and informative. Future research should aim to distinguish between specific, valuable facts and generic, less informative ones.",
+            "publication_ref": [
+                "b24"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Comparison with Baseline",
+            "text": "We provide a comparison of different components of Multi-FAct below.\nTrivial baselines: Random prediction: 8.86% Always \"Supported\": -41.15% Always \"Not Supported\": 58.86% In Table 4:\n• ChatGPT refers to GPT3.5-turbo.\n• No Retrieval ChatGPT means simply asking ChatGPT whether a fact is correct or not (closed book setting).\n• Retrieval + ChatGPT implies retrieving relevant passages from Wikipedia and then answering whether a fact is correct or not using GPT3.5.\n• Retrieval + Mistral refers to retrieving passages and then using Mistral 7B to answer whether a fact is correct or not. This is similar to the previous setting except for the fact verification LLM is being switched to an open-source model.\n• NPM refers to Non-Parametric Model (Min et al. (2022)), which requires having access to the Wikipedia article (ie, retrieval enabled).\n• The final method is the ensemble version of NPM and Retrieval + Mistral and it performs the best (also reported in original FActScore work (Min et al. (2023))). This is the one we used throughout our paper for other analyses.\nWhile GPT3.5 and Mistral 7B are very similar at atomic fact breakdown, we use Mistral 7B in all experiments to save cost.",
+            "publication_ref": [
+                "b20",
+                "b21"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "B Effect of non-LLM Based Translation",
+            "text": "In section 3.4.2, we showed that GPT3.5-based translation does not hurt the FActScore estimate. We have also explained the reason we use GPT3.5 over commercial translation systems like Google Translate is because Google Translate is not able to keep the gender of the subject consistent across the generation. Table 5 provides a comparison of translation of FActScore estimation when the translation is done by Google Translate vs GPT3.5.\nThe experiment set up for Table 5 was the same as Table 2. The small difference in Error with GPT3.5 column arises from the run-to-run stochasticity of the FActScore estimation.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_5",
+                "tab_5",
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "Can we skip the translation step altogether?",
+            "text": "We also experimented with generating atomic facts in the target language (thus, skipping the translation step) with French and Korean using GPT3.5 Turbo. Qualitative analysis with native Korean speakers revealed that the generated atomic facts are quite reasonably good. However, because there is no NPM model available for Korean and French, the FActScore estimates using atomic facts generated with those methods do not match the best-performing method (Retrieval+Mistral+NPM) provided in the above ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C Additional Results",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C.1 Results from other models",
+            "text": "Table 6 shows the benchmark results from Claude-3 and Gemini-1.0-pro model. We chose to use GPT4 for most of our analysis because GPT4 has the best performance in low resource languages.\nLanguage (Claude) haiku opus sonnet gemini-1.0-pro gpt3 ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_6"
+            ]
+        },
+        {
+            "heading": "C.2 Effect of Reference Length",
+            "text": "Sampling Method We randomly collected 10,000 people from 9 different Wikipedia using Wikipedia API and sorted them by their byte length. After that, we kept the top 100 entities that also had an English Wikipedia. Note that since we did this for each language separately, the list of 100 people differs for each language. However, manual inspection revealed that these entities are usually famous politicians, religious figures, famous athletes, and singers. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "D Geographical Biases in Factual Precision Across Subregions",
+            "text": "Figure 7: Continental distribution of top 20 countries that had the highest FActScore in each language for GPT4. The way to interpret this plot is, say for German, we sort the twenty most accurate presidents' biographies and then look up which continents they belong to. Note that for almost all languages, the top twenty biographies belong to subjects from America and Europe.\nWe examine how languages with notable variations in factuality across continents exhibit distinct geographical biases. Further analysis involves breaking down the continents into sub-regions to compare the number of correct facts and FActScore among three languages: Chinese and Korean, which exhibit he highest standard deviation (SD), and English, which demonstrates the lowest SD among the four continents, as detailed in Table 3 of § 5.2.\nChinese stands out in Eastern Asia, achieving the highest number of correct facts among all regions analyzed, indicating a pronounced bias towards its main linguistic area. Korean, also categorized in Eastern Asia, shows comparable levels of factuality in Eastern Asia to that of regions associated with America and Europe, underscoring geographical biases in the model's factual precision. English, while displaying a bias towards North America, its main region, exhibits relatively even factuality across other regions.\nFigure 8 shows the fine-grained geographic distribution of languages with the highest standard deviation (Chinese, Korean, Arabic) and the least standard deviation (English).  ",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_6"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "E List of Countries and Presidents",
+            "text": "Table 8 lists all the names of the countries, presidents and their Geographic locations. Please note that, we changed Australia and New Zealand to Oceania in the UN geoscheme for plotting purposes.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgments",
+            "text": "This research project has benefitted from the Microsoft Accelerate Foundation Models Research (AFMR) grant program through which leading foundation models hosted by Microsoft Azure along with access to Azure credits were provided to conduct the research. We thank Pang Wei Koh and Sewon Min for providing us with valuable feedback on an earlier draft of this work.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Country",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "mface: Multilingual summarization with factual consistency evaluation",
+            "journal": "",
+            "year": "2022",
+            "authors": "Roee Aharoni; Shashi Narayan; Joshua Maynez; Jonathan Herzig; Elizabeth Clark; Mirella Lapata"
+        },
+        {
+            "ref_id": "b1",
+            "title": "MEGA: Multilingual evaluation of generative AI",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023-12",
+            "authors": "Kabir Ahuja; Harshita Diddee; Rishav Hada; Millicent Ochieng; Krithika Ramesh; Prachi Jain; Akshay Nambi; Tanuja Ganu; Sameer Segal; Mohamed Ahmed; Kalika Bali; Sunayana Sitaram"
+        },
+        {
+            "ref_id": "b2",
+            "title": "The internal state of an llm knows when it's lying",
+            "journal": "",
+            "year": "2023",
+            "authors": "Amos Azaria; Tom Mitchell"
+        },
+        {
+            "ref_id": "b3",
+            "title": "A multitask, multilingual, multimodal evaluation of ChatGPT on reasoning, hallucination, and interactivity",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023-11",
+            "authors": "Yejin Bang; Samuel Cahyawijaya; Nayeon Lee; Wenliang Dai; Dan Su; Bryan Wilie; Holy Lovenia; Ziwei Ji; Tiezheng Yu; Willy Chung; Quyet V Do; Yan Xu; Pascale Fung"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Rachel Rudinger, and Hal Daume III au2. Multilingual large language models leak human stereotypes across language boundaries",
+            "journal": "",
+            "year": "2023",
+            "authors": "Trista Yang; Anna Cao; Jieyu Sotnikova; Linda X Zhao;  Zou"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Reading wikipedia to answer open-domain questions",
+            "journal": "",
+            "year": "2017",
+            "authors": "Danqi Chen; Adam Fisch; Jason Weston; Antoine Bordes"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Factool: Factuality detection in generative ai-a tool augmented framework for multi-task and multi-domain scenarios",
+            "journal": "",
+            "year": "2023",
+            "authors": "Steffi Chern; Shiqi Chern; Weizhe Chen; Kehua Yuan; Chunting Feng; Junxian Zhou; Graham He; Pengfei Neubig;  Liu"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Chain-of-verification reduces hallucination in large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Shehzaad Dhuliawala; Mojtaba Komeili; Jing Xu; Roberta Raileanu; Xian Li; Asli Celikyilmaz; Jason Weston"
+        },
+        {
+            "ref_id": "b8",
+            "title": "A survey on automated factchecking",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Zhijiang Guo; Michael Schlichtkrull; Andreas Vlachos"
+        },
+        {
+            "ref_id": "b9",
+            "title": "X-fact: A new benchmark dataset for multilingual fact checking",
+            "journal": "",
+            "year": "2021",
+            "authors": "Ashim Gupta; Vivek Srikumar"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Challenges and strategies in cross-cultural NLP",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022-05",
+            "authors": "Daniel Hershcovich; Stella Frank; Heather Lent; Mostafa Miryam De Lhoneux; Stephanie Abdou; Emanuele Brandl; Laura Cabello Bugliarello; Ilias Piqueras; Ruixiang Chalkidis; Constanza Cui; Katerina Fierro; Phillip Margatina; Anders Rust;  Søgaard"
+        },
+        {
+            "ref_id": "b11",
+            "title": "The importance of modeling social factors of language: Theory and practice",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021-06",
+            "authors": "Dirk Hovy; Diyi Yang"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Culturally aware natural language inference",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023-12",
+            "authors": "Jing Huang; Diyi Yang"
+        },
+        {
+            "ref_id": "b13",
+            "title": "A survey on hallucination in large language models: Principles, taxonomy, challenges, and open questions",
+            "journal": "",
+            "year": "2023",
+            "authors": "Lei Huang; Weijiang Yu; Weitao Ma; Weihong Zhong; Zhangyin Feng; Haotian Wang; Qianglong Chen; Weihua Peng; Xiaocheng Feng; Bing Qin"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Mistral 7b",
+            "journal": "",
+            "year": "2023",
+            "authors": "Alexandre Albert Q Jiang; Arthur Sablayrolles; Chris Mensch; Devendra Bamford; Diego Singh Chaplot; Florian De Las Casas; Gianna Bressand; Guillaume Lengyel; Lucile Lample;  Saulnier"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Is chatgpt a good translator? a preliminary study",
+            "journal": "",
+            "year": "",
+            "authors": "Wenxiang Jiao; Wenxuan Wang; Jen-Tse Huang; Xing Wang; Zhaopeng Tu"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Better to ask in english: Cross-lingual evaluation of large language models for healthcare queries",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yiqiao Jin; Mohit Chandra; Gaurav Verma; Yibo Hu; Munmun De Choudhury; Srijan Kumar"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Comparing hallucination detection metrics for multilingual generation",
+            "journal": "",
+            "year": "2024",
+            "authors": "Haoqiang Kang; Terra Blevins; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Proofver: Natural logic theorem proving for fact verification",
+            "journal": "Transactions of the Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Amrith Krishna; Sebastian Riedel; Andreas Vlachos"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Selfcheckgpt: Zero-resource blackbox hallucination detection for generative large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Potsawee Manakul; Adian Liusie; Mark J F Gales"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Nonparametric masked language modeling",
+            "journal": "",
+            "year": "2022",
+            "authors": "Sewon Min; Weijia Shi; Mike Lewis; Xilun Chen; Wen-Tau Yih; Hannaneh Hajishirzi; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Factscore: Fine-grained atomic evaluation of factual precision in long form text generation",
+            "journal": "",
+            "year": "2023",
+            "authors": "Sewon Min; Kalpesh Krishna; Xinxi Lyu; Mike Lewis; Wen Tau Yih; Pang Wei Koh; Mohit Iyyer; Luke Zettlemoyer; Hannaneh Hajishirzi"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Globalliar: Factuality of llms over time and geographic regions",
+            "journal": "",
+            "year": "2024",
+            "authors": "Shujaat Mirza; Bruno Coelho; Yuyuan Cui; Christina Pöpper; Damon Mccoy"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Fine-grained hallucination detection and editing for language models",
+            "journal": "",
+            "year": "2024",
+            "authors": "Abhika Mishra; Akari Asai; Vidhisha Balachandran; Yizhong Wang; Graham Neubig; Yulia Tsvetkov; Hannaneh Hajishirzi"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Having beer after prayer? measuring cultural bias in large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Tarek Naous; Wei Michael J Ryan;  Xu"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Kilt: a benchmark for knowledge intensive language tasks",
+            "journal": "",
+            "year": "2020",
+            "authors": "Fabio Petroni; Aleksandra Piktus; Angela Fan; Patrick Lewis; Majid Yazdani; Nicola De Cao; James Thorne; Yacine Jernite; Vladimir Karpukhin; Jean Maillard"
+        },
+        {
+            "ref_id": "b26",
+            "title": "FEVER: a large-scale dataset for fact extraction and VERification",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018-06",
+            "authors": "James Thorne; Andreas Vlachos; Christos Christodoulopoulos; Arpit Mittal"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Factcheck-gpt: End-to-end fine-grained document-level fact-checking and correction of llm output",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yuxia Wang; Revanth Gangi Reddy; Zain Muhammad Mujahid; Arnav Arora; Aleksandr Rubashevskii; Jiahui Geng; Osama Mohammed Afzal; Liangming Pan; Nadav Borenstein; Aditya Pillai"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Long-form factuality in large language models",
+            "journal": "",
+            "year": "2024",
+            "authors": "Jerry Wei; Chengrun Yang; Xinying Song; Yifeng Lu; Nathan Hu; Dustin Tran; Daiyi Peng; Ruibo Liu; Da Huang; Cosmo Du; Quoc V Le"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Wikipedia contributors. Wikipedia:multilingual statistics -Wikipedia, the free encyclopedia",
+            "journal": "",
+            "year": "2024-02",
+            "authors": ""
+        },
+        {
+            "ref_id": "b30",
+            "title": "Siren's song in the ai ocean: a survey on hallucination in large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yue Zhang; Yafu Li; Leyang Cui; Deng Cai; Lemao Liu; Tingchen Fu; Xinting Huang; Enbo Zhao; Yu Zhang; Yulong Chen"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Reasoning over semantic-level graph for fact checking",
+            "journal": "",
+            "year": "2019",
+            "authors": "Wanjun Zhong; Jingjing Xu; Duyu Tang; Zenan Xu; Nan Duan; Ming Zhou; Jiahai Wang; Jian Yin"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure1: Our Multi-FAct Pipieline. The pipeline is structured into three main stages: 1) Obtaining multilingual generations, 2) Translating these facts into English using GPT-3.5, and 3) Measuring factuality, by breaking them down into smaller atomic facts(Min et al., 2023) and then verifying them by asking LLMs with context provided.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 2 :2Figure 2: The Wikipedia size distribution for languages in this study. (c) shows the number of human-annotated examples that also have representation in the corresponding Wikipedia. Note that Wikipedia size differs widely across languages, which usually means non-English Wikipedia articles are not as comprehensive as English Wikipedia articles for fact verification.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "(a) Multi-FAct estimation for persons with 'large' Wikipedia articles in corresponding language. (b) Ensembling multiple non-English Wikipedias work better than single language Wikipedia.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 6 :6Figure 6: Number of correct and hallucinated facts by GPT-3.5 and GPT-4 for each language. The number on top of each bar is the FActScore .",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 8 :8Figure 8: Fine-grained geographic distribution of languages with the highest standard deviation (Chinese, Korean, Arabic) and the least standard deviation (English) is given. The top bar represents the average number of hallucinated facts, and the bottom one denotes correct facts. The number on top of each bar represents FActScore .",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "",
+            "figure_caption": "",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Summary of Replication. Error refers to the difference between human FActScore and FActScore determined by our method. Standard deviation is reported alongside each",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "",
+            "figure_data": "English0.84-0.0140.13German0.83-0.0070.13French0.80-0.0040.14Spanish0.81-0.0140.14Swahili0.81-0.0150.13Arabic0.820.0210.14Chinese0.810.0400.14Korean0.800.0090.14Bengali0.840.0270.13"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "",
+            "figure_data": "Spanish0.6240.6410.6270.6400.633 0.087German0.6220.6420.6160.6280.627 0.094Swahili0.6430.6370.5850.6100.619 0.096English0.6070.6320.6130.6070.615 0.086French0.5950.6550.6090.5940.613 0.110Bengali0.5790.5740.5850.5890.582 0.149Arabic0.4930.5590.4850.5220.515 0.167Korean0.4810.5010.4900.4760.487 0.208Chinese0.4530.5020.4790.5140.487 0.230Table"
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Multi-FAct pipeline component comparison across different languages.",
+            "figure_data": "MethodArabic Swahili Bengali Chinese Korean French German Spanish MeanNo Retrieval ChatGPT-0.268-0.282-0.260-0.265-0.277-0.278-0.288-0.290-0.276Retrieval + ChatGPT-0.163-0.190-0.165-0.168-0.177-0.177-0.175-0.187-0.175Retrieval + Mistral-0.150-0.180-0.169-0.162-0.172-0.171-0.175-0.174-0.169NPM-0.097-0.133-0.105-0.096-0.098-0.140-0.149-0.153-0.121Retrieval + Mistral + NPM0.028-0.0160.0220.0290.006-0.013-0.013-0.0120.004"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "FActScore estimation error rate comparison when translation to English was done using GPT-3.5 and GTranslate across different languages",
+            "figure_data": "Source Language GPT3.5 Error GTranslate ErrorArabic0.0280.051Swahili-0.01570.0168Bengali0.02190.057Chinese0.02890.0883Korean0.00630.0453French-0.0126-0.0106German-0.0127-0.0019Spanish-0.01150.0581Mean0.00410.0380"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "FActScore estimation of the other models on the same national leaders' biography generation task. Note that only GPT4-turbo has the overall highest performance and on average GPT4 series models have good performance across all languages.Note that model response size varies significantly across languages and models, which is not captured in this table. Similar to what is shown in figure6, most of the models in this table tend to generate much longer responses for English and high-resource languages. The average response length also differs from model family to model family.",
+            "figure_data": ".5 gpt4-turbo gpt4o-mini gpt4o"
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "shows the word count distribution for the selected Wikipedia articles.",
+            "figure_data": "Language Mean Text Length (Language Wiki) Mean Text Length (English Wiki)Spanish3353.946895.68French3617.136569.71German3519.035723.78Korean1520.795144.43Chinese2879.444937.70Arabic2829.485648.35Swahili865.855003.25Bengali2772.495829.74"
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_8",
+            "figure_caption": "Comparison of mean text lengths (in words) in Various Language Wikipedia after translating to English vs length of the same articles English Wikipedia. For the same subjects, English Wikipedia has much larger articles than the other languages.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "# of Correct Facts(M) = 1(a is supported by C) FActScore (M) = 1 |A| ∑ a∈A # of Correct Facts(M)(1)",
+            "formula_coordinates": [
+                4.0,
+                202.92,
+                361.15,
+                302.08,
+                42.81
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/2023.emnlp-main.258"
+}

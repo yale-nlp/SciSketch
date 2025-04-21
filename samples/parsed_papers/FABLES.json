@@ -1,0 +1,1654 @@
+{
+    "title": "Evaluating faithfulness and content selection in book-length summarization",
+    "caption": "The pipeline for collecting faithfulness annotations in book-length summarization(FABLES)",
+    "authors": "Yekyung Kim; Yapei Chang; Marzena Karpinska; Aparna Garimella; Varun Manjunatha; Kyle Lo; Tanya Goyal; Umass Amherst; Elinor De Witt; Curtis Sittenfeld",
+    "pub_date": "",
+    "abstract": "While long-context large language models (LLMs) can technically summarize book-length documents (> 100K tokens), the length and complexity of the documents have so far prohibited evaluations of input-dependent aspects like faithfulness. In this paper, we conduct the first large-scale human evaluation of faithfulness and content selection on LLM-generated summaries of fictional books. Our study mitigates the issue of data contamination by focusing on summaries of books published in 2023 or 2024, and we hire annotators who have fully read each book prior to the annotation task to minimize cost and cognitive burden. We collect FABLES, a dataset of annotations on 3,158 claims made in LLM-generated summaries of 26 books, at a cost of $5.2K USD, which allows us to rank LLM summarizers based on faithfulness: CLAUDE-3-OPUS significantly outperforms all closedsource LLMs, while the open-source MIXTRAL is on par with GPT-3.5-TURBO. An analysis of the annotations reveals that most unfaithful claims relate to events and character states, and they generally require indirect reasoning over the narrative to invalidate. While LLM-based auto-raters have proven reliable for factuality and coherence in other settings, we implement several LLM raters of faithfulness and find that none correlates strongly with human annotations, especially with regard to detecting unfaithful claims. Our experiments suggest that detecting unfaithful claims is an important future direction not only for summarization evaluation but also as a testbed for long-context understanding. Finally, we move beyond faithfulness by exploring content selection errors in book-length summarization: we develop a typology of omission errors related to crucial narrative elements and also identify a systematic over-emphasis on events occurring towards the end of the book. We release FABLES to spur further research on the evaluation of book-length summarization. https://github.com/mungg/FABLES summary This is a good account of the book, although there were a couple of inaccurate statements.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": "Advances in long-context language models have sparked interest in summarizing booklength documents (>100K tokens). Despite the importance of faithfulness and content relevance for summary quality, recent work in this regime focuses only on input-agnostic aspects like coherence (Chang et al., 2023b). This is due to the length and complexity of the input documents: hiring human annotators to read and understand them is expensive and time-consuming. Our work fills this gap by presenting the first large-scale human evaluation of faithfulness and other content selection errors in book-length summarization.\nWe mitigate challenges associated with document complexity by hiring workers who have already read a book published in 2023 or 2024 (to avoid data contamination) for enjoyment prior to beginning the annotation task. We produce summaries for these books via five Every morning as Rose Mackie leaned over the bars of the wooden cot (...) Elinor had been evacuated to Sussex at the end of August 1939, just before war was declared, and was living with her foster family when everything in her world changed. The billeting officer came to the door to tell her that her mum, dad and two brothers-who were fifteen and sixteen... configurations of the hierarchical summarization methodology described in Chang et al.  (2023b), each of which varies the base LLM and chunk size. Following prior work on faithfulness and factuality evaluation, such as LongEval (Krishna et al., 2023) and FactScore (Min  et al., 2023), we decompose each summary into a list of claims which are then individually verified against the input document.\nIn total, our FABLES dataset (Faithfulness Annotations for Book-Length Summarization) contains 3,158 claim-level annotations of faithfulness across 26 narrative texts, along with evidence for each claim in the form of quotations from the book as well as free-form comments at both the claim and summary level (Figure 1). 1 Overall, we observe that CLAUDE-3-OPUS is the most faithful book-length summarizer by a significant margin, followed by GPT-4-TURBO. Beyond ranking LLMs, our annotations also shed light on the following previously unexplored questions:\nWhat kinds of faithfulness errors do LLM summarizers make? ( §3) A qualitative analysis of FABLES reveals that the majority of claims marked as unfaithful are related to events or states of characters and relationships. Furthermore, most of these claims can only be invalidated via multi-hop reasoning over the evidence, highlighting the task's complexity and its difference from existing fact-verification settings (Min et al., 2023; Kamoi et al., 2023).\nCan faithfulness be evaluated automatically? ( §4) Collecting human annotations on 26 books cost us $5.2K, demonstrating the difficulty of scaling our workflow to new domains and datasets. We thus implement multiple LLM-based raters of faithfulness, following prior work such as BooookScore (Chang et al., 2023b) and FactScore (Min et al., 2023) that achieve high correlation with human judgments. However, all of our metric configurations struggle to reliably identify unfaithful claims. Our best-performing method operates similarly to \"needle-in-the-haystack\"-style evaluations (Kamradt, 2023; Gemini Team, 2024) by feeding as much of the book as possible into a long-context LLM along with a single claim to verify. We promote this claim-level verification task as both important for book-length summarization evaluation as well as a challenging benchmark for long-context understanding.\nWhat other errors, beyond faithfulness, do LLM summarizers make? ( §5) By coding all of the summary-level free-form comments in FABLES, we find that annotators frequently point out omissions of critical information. We develop the first taxonomy of omission errors in book-length summarization and observe that key events, details, and themes are frequently omitted by all LLMs. We also observe other content selection errors: for example, even our strongest summarizers, CLAUDE-3-OPUS and GPT-4-TURBO, over-emphasize content towards the end of books to the detriment of the beginning.\nAll prompts used in this paper can be found in §B.",
+            "publication_ref": [
+                "b74"
+            ],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Extracted Claims",
+            "text": "1. Sally Milz is a writer for the comedy sketch show The Night Owls (TNO). 2. Musician Noah Brewster hosted The Night Owls in 2018. 3. Two years after Noah's stint on TNO, he initiates contact with Sally via email. 4. Sally and Noah begin corresponding and quickly develop a close bond, discussing their lives, careers, and personal philosophies. 5. Sally, who has been at TNO for 11 years, considers leaving the show to pursue a career in screenwriting. 6. Sally drives from her home in Kansas City to visit Noah at his house in Los Angeles. 7. During her visit to Los Angeles, Sally and Noah's relationship becomes physically intimate. 8. Sally struggles with insecurities about dating a celebrity and the public scrutiny that comes with it. 9. Sally temporarily retreats to a hotel to sort out her feelings about her relationship with Noah. 10. Sally's stepfather, Jerry, falls ill with COVID-19 in Kansas City. 11. Noah accompanies Sally back to Kansas City to help care for her sick stepfather, Jerry. 12. The experience of caring for Jerry deepens the connection between Sally and Noah. 13. Sally decides to leave TNO and move to Los Angeles to be with Noah. 14. Sally and Noah get married in a private ceremony in 2021. 15. After moving to Los Angeles, Sally begins working on her first feature film script. 16. Noah continues his music career in Los Angeles, touring when possible. 17. Jerry and his beagle, Sugar, move in with Sally and Noah. 18. The novel \"Romantic Comedy\" explores themes of finding love later in life. 19. The novel also navigates the challenges of fame and balancing personal and professional aspirations. 20. The impact of the COVID-19 pandemic on relationships and family dynamics is a theme explored in the novel. 21. Throughout the novel, Sally grapples with her own insecurities. 22. Sally learns to embrace happiness and love when they come into her life unexpectedly in the novel \"Romantic Comedy\". Unfaithful -misrepresentation of the narrative, (c) Partial Support -partially corroborated by the narrative, or (d) Can't verify -indeterminable. They provided free-form textual justifications to support their selections, including evidence in the form of quotations from the book when relevant. • Summary-level: Provide free-form summary-level comments on the overall quality of the summaries. Annotators critiqued the claim set as a whole, identifying omissions, inaccuracies, disproportionate emphasis on trivial plot points, or other concerns.\nThe annotators used a customized interface, 5 which provided them full access to the book text for reference. Each annotator was assigned to annotate all five LLM-generated summaries for their assigned book, which were presented in a randomized order. Annotators received $200 for this task, which took ∼11 hours to complete (STD=6.34). In total, FABLES contains 3,158 annotated claims from 130 summaries across 26 books at a cost of $5.2K USD.\nWe assess the quality of our dataset using inter-annotator agreement and self-consistency metrics. More details can be found in §C.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Developing a taxonomy of faithfulness errors in FABLES",
+            "text": "In this section, we present results from our statistical and qualitative analysis of the 3,158 claim-level faithfulness annotations in FABLES, which include both free-form comments and citation evidence to support or refute these claims. 6 Broadly, we observe that CLAUDE-3-OPUS is the most faithful LLM summarizer, with 90% of its claims rated as faithful, followed by GPT-4 and GPT-4-TURBO at 78%, GPT-3.5-TURBO at 72%, and MIXTRAL at 70% (Table 2).  ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Analysis of unfaithful claims:",
+            "text": "To further study the nature of unfaithful claims, we characterize all 205 such claims along two dimensions: CLAIM TYPE and REASONING TYPE (see Table 3 for taxonomy and frequency counts). Roman is not under pressure, his father bribes people so he gets his dream job.\nEvent 31.5 Patricia Liu, Athena's mother, discovers that June has sold Athena's manuscript and confronts her.\nPatricia never confronts June.\nCause/effect 11.2 Lilly's abusive ex-boyfriend, Alan Bushy, becomes a suspect due to the meticulous nature of the murders.\nHe becomes a suspect because he was abusive to Lilly.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "High-level 11.2",
+            "text": "The narrative is non-linear and features flashbacks, switches between alternate worlds or viewpoints, and present-day conversations between Sally and Danny.\nThe narrative is largely linear. The narrative reveals that Maggie had a brief affair with a doctor named Danny in Bangkok while she was being followed by unknown entities.\nThe book directly states that they are married, so it's not a brief affair.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Subjective 7.2",
+            "text": "Forest is torn between his desire to protect Iris and confronting his past actions.\nI don't think Forest makes any real effort to confront his past actions Extra info 5.7\nThe book \"Wildfire\" is the first in the Icebreaker series.\nIt's not stated in the book, but this is actually the second in the series. For each label, we report its frequency and provide an example claim-reason pair. More examples and the general labeling scheme can be found in Table 15.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_7"
+            ]
+        },
+        {
+            "heading": "Challenges with automatic faithfulness evaluation",
+            "text": "While insightful, human annotation of faithfulness in book-length summarization is simply not scalable: our annotations cost $40 USD per summary for a total cost of $5.2K USD, which is prohibitively expensive for usage during model development and with bigger corpora. In this section, inspired by methods such as FactScore (Min et al., 2023) and BooookScore (Chang et al., 2023b), we develop LLM-powered automatic raters of faithfulness that operate at the claim level. However, our best method, which relies on prompting CLAUDE-3-OPUS with the entire book to verify a single claim, is expensive and unreliable at detecting unfaithful claims in FABLES, suggesting important directions for future work.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Automatic raters of faithfulness:",
+            "text": "We implement our automatic raters by prompting an LLM in a zero-shot manner to verify a single claim given evidence from the book (Table 13), where the evidence can be one of the following:\n• None: As a lower bound, we evaluate the faithfulness of claims without any evidence from the book.\n• Human evidence: We can also use human-annotated evidence from FABLES obtained via the pipeline described in §2. This evidence is always related to the claim, but it often takes the form of short, highly-contextual spans that may or may not be sufficient to support claim verification.\n•  BM25 retrieval: We employ BM25 (Robertson et al., 1995) to retrieve passages from the book using the claim as a query. We concatenate the k most relevant passages to use as evidence for our evaluation prompt. We set k = 5 and chunk passages up to 256 tokens. See §G.4 for performance changes when varying passage length.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "•",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Entire book (EB):",
+            "text": "Retrieval is especially challenging in our setting due to the complexity of both the query and document. Intuitively, long-context LLMs can bypass explicit retrieval by simply fitting the entire book into the context as evidence. This setting resembles \"needle-in-the-haystack\" evaluations of prior work (Kamradt,  2023; Levy et al., 2024), except that it tests a much deeper understanding of the input document.\nDataset for experiments: Due to budget constraints associated with the \"entire book\" setting, we select seven books, each shorter than 125K tokens, to evaluate the performance of our auto-rater configurations. This results in 723 total claims, 69 of which are marked as Unfaithful and 654 as Faithful by our human annotators. Note that we do not consider partially supported or unverifiable claims in our experiments due to the increased subjectivity associated with these labels. Detailed information regarding this dataset and experiment costs can be found in §G.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results:",
+            "text": "We evaluate the performance of each auto-rater configuration by comparing its predictions to the ground-truth labels (Faithful and Unfaithful) from our human annotations. Due to the class imbalance, we report separate F1 scores for each label, split across claims generated by different LLMs, in Table 5. 9 As a sanity check, the \"no evidence\" setting performs extremely poorly; more interestingly, human evidence underperforms both retrieval and the entire book setting, suggesting that the LLM requires more context to judge claim validity. The best performing auto-rater is CLAUDE-3-OPUS in the entire book setting, which significantly outperforms both GPT-4-TURBO in the same setting as well as BM25.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_7"
+            ]
+        },
+        {
+            "heading": "Conclusion:",
+            "text": "Despite it having the best performance in Table 5, CLAUDE-3-OPUS ultimately performs too poorly to be a reliable auto-rater (58.2 F1 when classifying Unfaithful claims). This comes as a surprise as this pattern of decompose-then-verify has been shown to correlate with human judgments in other settings, like Min et al. (2023). Manual analysis of FALSE: While the weeding is the end goal/plan for the book, the climax occurs when the protagonist, Janelle and her sister Amerie have a confrontation.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_7"
+            ]
+        },
+        {
+            "heading": "TRUE TRUE TRUE:",
+            "text": "At first she is mad that Rennick killed Gilpin. Then she is happy that he killed him for her honor. Her moral crisis is that she is okay with Gilpins death.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "FALSE FALSE FALSE TRUE FALSE: Justine doesn't accept Mrs Price explanation, Mrs Price attacks her and starts to strangle her, in that moment Justine kills Mrs",
+            "text": "Price with the special pen that her mother gave to her.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "FALSE TRUE TRUE:",
+            "text": "Martha is referring to the eight years she and Patrick had been married for: \"The sofa became our stock answer to the question of how we met after that. We did it for eight years, with few variations. People always laughed.\"\nThe climax of the story is the longanticipated wedding of Amerie and Arnold.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Amelia experiences a moral crisis upon learning of Rennick's role in Gilpin's murder.",
+            "text": "Justine eventually accepts Mrs. Price's explanation, leading to an improved relationship between them.  the errors reveals that CLAUDE-3-OPUS struggles most with claims involving non-narrative information (23.1%), assessments often based on common sense reasoning (20.5%), and character confusions (12.8%), which often require a deep understanding of the entire book; see confusion matrix in Figure 3 and more details in §32. Qualitatively, we can also gauge from annotator comments (Table 4) the difficulty of this claim verification task as evidence may be difficult to localize (in \"needle-in-the-haystack\" manner) and require full document reasoning.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_4"
+            ],
+            "table_ref": [
+                "tab_5"
+            ]
+        },
+        {
+            "heading": "Martha and",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "COMMENTS",
+            "text": "The hardest part was that some of the claims were very general about the text, such as describing overall character arcs, which made it hard to find specific textual support.\nThe most difficult part for me was how general some of the sentences were. Because the material was so broad, I felt that I could use 20 or 30 quotations. For example, this book is about many stories of a private investigator in Africa (not exactly what it said, but close). I could recite the entire book.\nThe most difficult part for me was finding supporting quotations for claims that were more abstract (e.g. \"The book grapples with the scars of colonialism.\"). Although I was able to tell right away whether the claim was true or false, based on my own reading, it was at times difficult to find a specific quotation that best proved the claim. The themes were more often implicit in the text, rather than explicit.\nThe most difficult part was to give citations for claims about writing style and intent. The reason was that these claims are usually based on the book as a whole, so an accurate citation would be the whole book.  General issues with LLM-generated summaries: Table 6 summarizes the percentage of summaries affected by specific issues as per annotators' comments. 11 Our analysis shows that every LLM makes chronological errors, though these were less pronounced in models with extended context (CLAUDE-3-OPUS and GPT-4-TURBO). All models were also criticized for omitting important information, with CLAUDE-3-OPUS being the least affected (52%), compared to 80.8% and 84.6% for GPT-4-TURBO and GPT-3.5-TURBO, respectively. The least faithful models, GPT-3.5-TURBO and MIXTRAL, also both have a tendency to generate overly generic statements (38.5%). Finally, we look also at cases where the summary was explicitly praised for being good or comprehensive. CLAUDE-3-OPUS received the most praise (48% and 54% respectively), while GPT-3.5-TURBO received the least (11.5% and 15.4% respectively).",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_9"
+            ]
+        },
+        {
+            "heading": "Exploring omission errors:",
+            "text": "As mentioned above, omission of key information plagues all LLM summarizers. To better understand the nature of the omission errors identified by our annotators, we categorize them into the following categories: characters, events, details, relationships, themes. 13 Figure 4 shows a heatmap of omission errors broken down by model. A large proportion of summaries (33.3% to 65.4%) lack mentions of key events, creating gaps in the overall narrative, and we also note omissions of significant details about the characters, events, or objects (16.7% to 38.5%). Furthermore, GPT-4-TURBO and MIXTRAL have a tendency to entirely omit mentions of crucial characters (23.1%).\n10 Details of the annotation scheme used to analyze the comments are in Table 21 in the §F 11 In two cases, CLAUDE-3-OPUS refused to merge two summaries, as they were affected by the extra information available in the front and back matter and did not constitute a logical story. We excluded these cases from this analysis. 12 Percentage of summaries where the annotator expressed specific concerns about the factuality of the entire claim set. See §D for the percentage of affected claims per summary. In short, most summaries contained factual inaccuracies with only five summaries receiving 100% of Faithful labels (indicating complete factual accuracy). 13 Since annotators did not identify every specific omission, we focused on a binary classification: whether a summary was impacted by a given omission type, rather than counting the total number of omissions by type. See Table 22 in the §F for more details. CLAUDE-3-OPUS GPT-4-TURBO GPT-4 GPT-3.  ",
+            "publication_ref": [
+                "b67",
+                "b85",
+                "b67"
+            ],
+            "figure_ref": [
+                "fig_5"
+            ],
+            "table_ref": [
+                "tab_15",
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Long-context models overemphasize book endings:",
+            "text": "One interesting observation is that CLAUDE-3-OPUS and GPT-4-TURBO, which both have chunk sizes ≥ 100K, tend to place more emphasis on the endings of the books to the detriment of the beginning. Since these models were often provided with the entire book context during prompting, this suggests a potential issue in processing long inputs (Kamradt, 2023; Levy et al., 2024). This phenomenon is especially prominent with CLAUDE-3-OPUS, where at least 20% of the generated summaries exhibit an overemphasis on the book's ending, compared to 7.7% for GPT-4-TURBO (see examples in Table 25 in the §F). We also note that the back matter of many books (e.g., author's biography, dedications, etc.) often unduly impacts all LLMs during the summarization process. We observe conflation between characters in the narrative and names in the back matter, as well as entirely hallucinated narratives; CLAUDE-3-OPUS is the only model seemingly unaffected by this additional information; see §F for more analysis on this phenomenon. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_7"
+            ]
+        },
+        {
+            "heading": "Conclusion",
+            "text": "We present FABLES, the first large-scale human evaluation of faithfulness and content selection in book-length summarization. By recruiting annotators who had read recentlypublished books for enjoyment, we collect 3,158 claim-level faithfulness annotations from LLM-generated summaries of 26 narratives. This allows us to rank LLM summarizers based on faithfulness, revealing that CLAUDE-3-OPUS is the most faithful book-length summarizer, followed by GPT-4-TURBO. Next, we experiment with using LLMs for automatic claim verification. Our results expose the limitations of both retrieval and long-context understanding: LLM auto-raters cannot reliably detect unfaithful claims, even when prompted with the full book text. Our analysis shows that unfaithful claims primarily pertain to states and events, often necessitating reasoning over extended contexts, which makes them complicated to detect for both humans and machines. Finally, we move beyond faithfulness to explore and characterize common content selection errors such as omissions of key events, attributes, and characters, as well as the over-emphasis of content from the end of the book.\nOur work on FABLES suggests several promising directions for future work. With better auto-raters of faithfulness, we can perform fine-tuning or preference tuning on long-context language models by using the auto-raters as a scorer (Tian et al., 2023), which could improve their summarization capabilities by reducing hallucination (Cao et al., 2021). Additionally, FABLES can be used as a dataset and protocol to meaningfully benchmark future work on novel long-context language model architectures and training objectives.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethical considerations",
+            "text": "All annotators consented to the use and publication of their annotations. The dataset excludes copyrighted texts, containing only annotations done on model-generated sum-mary claims. Additionally, we ensured annotators received fair compensation for their contributions.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Dataset",
+            "text": "In this section, we include further details about FABLES. We list all the books used for summarization in Table 7, along with details about the authors, genre, length, publication date, and variety of English. We also detail the data preprocessing process in §A.1.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_10"
+            ]
+        },
+        {
+            "heading": "A.1 Data Preprocessing",
+            "text": "Preprocessing books: In order to obtain the summaries via hierarchical merging, we first purchased books from amazon.com in epub format and converted them into text files, retaining all information intact (i.e., without removing front and back matter). We then used the Huggingface GPT-2 tokenizer 14 to divide the books into chunks fitting the models' context window. During our chunking step, we checked for punctuation marks to ensure that all chunks end with a complete sentence. This approach sometimes resulted in chunks being shorter than the specified size, leading to the final chunks of some books consisting only of brief snippets with meta information, which could influence the summaries. Ideally, a robust model would distinguish between supplementary information and the main storyline to produce a coherent summary. However, we observed that some models were influenced by this extra information, leading them to fabricate aspects of the story.",
+            "publication_ref": [
+                "b68"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Generating summaries:",
+            "text": "To summarize book-length documents, we adopt the hierarchical merging strategy which Chang et al. (2023b) found to outperform competing approaches in terms of summary coherence. We employ zero-shot prompting to summarize each chunk independently. Next, we form pairs of adjacent chunk-level summaries and again use zeroshot prompting to merge each pair, incorporating added context from previously-generated merged summaries to ensure coherence and continuity (see Figure 1a). We generate five summaries for each book in this fashion using GPT-3.5-TURBO, GPT-4, GPT-4-TURBO (Ope-nAI, 2023), MIXTRAL (Jiang et al., 2024), and CLAUDE-3-OPUS (Anthropic, 2023). All summaries were generated in February 2024 using the following checkpoints: gpt-3.5-turbo, gpt-4, gpt-4-turbo-preview, Mixtral-8x7B-Instruct-v0.1, and claude-3-opus-20240229. We use publicly-released code, prompts, and hyperparameters from Chang et al. (2023b) for summary generation. We further prompt GPT-4 model to extract decontextualized claims from the summaries. Examples of summaries along with extracted claims can be found in Table 8, Table 9 ",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": [
+                "tab_12"
+            ]
+        },
+        {
+            "heading": "B Prompts",
+            "text": "In this section, we included all prompts used for our experiments: (1) claim extraction, (2) automatic evaluation in Table 13.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "C Human Annotations",
+            "text": "In this section, we present details of our annotation task. Figure 5 displays the instructions provided to annotators for evaluating faithfulness. Figure 6 illustrates the interface used by annotators for this task. The list of claims is displayed on the left side of the screen, with each claim on a separate line. Content of the book is presented on the right side. Annotators can navigate the book's content using the scroll function and perform keyword searches to locate relevant information. When annotators hover over a claim, it becomes highlighted, and clicking on it triggers a popup window to appear (see Figure 7). Given that completing the annotation process takes a considerable amount of time (approximately 1.5h-2.5h), we have implemented a feature that allows annotators to save their work at any point during the annotation process. Upon completing the annotations, the annotator is required to  provide a comment on the overall quality of the summary claims by clicking on general comments (see Figure 8).\nHow do annotators perceive the task? Annotators highlighted several challenges in assessing the summaries, particularly when dealing with broad claims about themes rather than specific plot points, making it difficult to find relevant supporting evidence within the text. Abstract concepts, like emotions or thematic claims, posed significant obstacles, with some annotators struggling to locate quotations that precisely supported or refuted these claims. They also pointed out the difficulty of evaluating claims that were only partially true, which required more detailed support (see Table 4 for actual comments). ",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_8",
+                "fig_9",
+                "fig_10"
+            ],
+            "table_ref": [
+                "tab_5"
+            ]
+        },
+        {
+            "heading": "I. Task Overview",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "III. Annotation Instructions",
+            "text": "You will be working with the following interface:\nThe list of claims is on the left (one on each line), and the book's content is on right.\nYour annotation activity will take place in the space provided on the left.   ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Quality of Annotations",
+            "text": "We perform two additional analysis experiments that demonstrate the high quality of our dataset: (1) self-consistency of annotations (i.e., how often a single annotator assigns the same label to claims with the same semantic content generated by different models), and (2) inter-annotator agreement on a subset of claims where we had access to another annotator who also read the book.\n• Inter-annotator agreement: For two books in our dataset, we hired an additional annotator who had also read them to provide overlapping annotations. This resulted in 115 claims with overlapping annotations, allowing us to evaluate the agreement rate between the original and new annotators. The new annotator is 91.30%, with Cohen's Kappa of 0.621 (p < .0001), indicating substantial agreement.\nUnfortunately, annotating the entire dataset with multiple annotators is unfeasible due to the difficulty and high cost of finding multiple individuals who have read the same book. Each annotation costs approximately $200 to $250 per book and requires around 10 hours of work.\n• Self-consistency: For each book, an annotator analyzed five summaries, each generated by a different model. To assess self-consistency (intra-annotator agreement), we randomly selected five books and compared the annotations made on the first and last summaries (as per annotation order) for claims with the same semantic content. For example, \"Aurora suffers emotional discomfort due to her father's disinterest and her parents' failed marriage\" and \"Aurora struggles with her father's lack of attention and affection\" are semantically equivalent claims from summaries of Wildfire generated by GPT-4 and Claude3, respectively. By comparing the first and last summaries, we evaluated the annotators' consistency in handling claims after significant time intervals, during which they annotated three additional summaries. Consistency in labels for similar claims across these two summaries would indicate stable judgment and suggest that labels were not arbitrarily assigned. Out of 127 claims examined in the first summary, 46 had semantically equivalent claims in the last summary, and we found that all 46 of these claims were consistently labeled.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "D Results of Human Evaluation",
+            "text": "This section provides details on the number of Unfaithful and Partially Supported claims per summary. Figure 9 presents the percentage of problematic claims (either Unfaithful or Partially Supported) identified within each model's summaries. Notably, only four (4) out of 130 summaries were rated 100% Faithful (two by GPT-3.5-TURBO, one by GPT-4-TURBO, and one by MIXTRAL). The remaining summaries varied in accuracy, with some containing up to 66.67% incorrect or partially incorrect claims.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_11"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "E Analysis of Faithfulness Annotations",
+            "text": "In this section, we provide additional details on our analysis of faithfulness annotations involving unfaithful claims. Refer to Table 15 for our general labeling scheme and examples for each category. Table 17 shows the reasoning type distribution for each claim type.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_7",
+                "tab_10"
+            ]
+        },
+        {
+            "heading": "Evidence coverage and reasoning-claim relationship",
+            "text": "To investigate the quality of evidence provided by annotators, we analyze the coverage of evidence with respect to the annotators' reasoning. In addition, we also analyze the relationship between the claim and the annotators' reasoning. Results are summarized in Table 16. 51.6% of the time, annotators provide some evidence to justify every component of their reasoning (i.e., complete coverage).\nIn 56% of partial coverage (i.e., some part of the reasoning does not have corresponding evidence) cases and all cases of N/A coverage (i.e., no evidence is provided at all), the missing evidence is due to the annotator's inability to find any relevant information that either supports or refutes the claim. Qualitatively, for all matched reasoning-evidence pairs, we find that the evidence often does not provide enough context that would allow someone no summary provided no summary provided who has not read the book to determine the faithfulness of the claim. As a result of decontextualization, claims always refer to people by name, but evidence often use pronouns instead. The annotator would need to quote a much larger chunk from the book in order for the evidence to include names as well. An even trickier case is that when dealing with high-level claims like \"X is the protagonist of the story\" or \"The themes of the story are X, Y, and Z,\" one needs knowledge of the entire book, but citing the entire book as evidence is trivial. If annotators were to collect self-contained and sufficient evidence for every claim, the task would become significantly more challenging, sometimes even impossible. This difficulty with evidence gathering sheds light on why automatic evaluation does not work so well for this task.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_9"
+            ]
+        },
+        {
+            "heading": "Model-wise analysis",
+            "text": "We report model-wise results on reasoning type and reasoning-claim relationship in Table 18 and Table 19.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_12"
+            ]
+        },
+        {
+            "heading": "F Comment Analysis",
+            "text": "In this section, we provide additional details regarding our analysis of the comments provided by annotators on the summary claims. Table 20 features examples of such comments. These comments were further annotated based on the criteria outlined in Table 21 and Table 22. The distribution of errors is depicted in Figure 10 and Table 23.\nTable 24 displays examples where the models' generation was influenced by information in the front and back matter. Table 25 highlights comments indicating that models may sometimes overly focus on the latter parts of the stories. Lastly, Table 4 shares annotators' feedback on the annotation task.\nImpact of front and back matter on the summary quality Books frequently contain additional information beyond the main narrative, including the author's biography, table of contents, dedications, and more, positioned at the beginning or the end of the book. Ideally, models should exclude this extraneous content, focusing solely on summarizing the core story. However, we have noted that models are sometimes unduly influenced by these elements, which can dominate a significant part of the summary and occasionally compromise its accuracy. Overall, between 19.23% (GPT-3.5-TURBO and GPT-4) and 34.62% (MIXTRAL) of summaries were affected by such content, either through focusing on this information, 15 confusing story characters with names found in the front and/or back matter, 16 or making up entire narrative based on a single mention.17 CLAUDE-3-OPUS was the only model seemingly unaffected by the additional information. However, when faced with two summaries-where one primarily summarized the content of the back matter, since it represented the final chunk-the model declined to perform the task. We regard this cautious approach as preferable to introducing unfounded details or irrelevant content.\nExamples of such cases are shown in Table 24.",
+            "publication_ref": [
+                "b50"
+            ],
+            "figure_ref": [
+                "fig_13"
+            ],
+            "table_ref": [
+                "tab_14",
+                "tab_15",
+                "tab_1",
+                "tab_4",
+                "tab_5",
+                "tab_7",
+                "tab_5",
+                "tab_5"
+            ]
+        },
+        {
+            "heading": "G Details on Experimental Setup",
+            "text": "In this section, we provide further details on our experimental setup complemented with further results.   ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "G.1 Implementation details",
+            "text": "For BM25-based evidence retrieval, we use the text of e-books purchased from amazon.com, split into passages of up to 256 tokens each. The search is restricted to the book content, and we set k = 5 to retrieve the top 5 most relevant passages as evidence.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "G.2 Additional Results",
+            "text": "Results for each evidence extraction method broken down by summarizer can be found in Table 26. We also report book-wise precision and recall for each evidence extraction method:\n(1) No-Context (Table 27); (2) BM25 (Table 29); (3) Human evidence (Table 28); (4) Entire book (Table 30). Further results for the entire book (EB) prompting can be found in §G.3.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_9",
+                "tab_16",
+                "tab_18",
+                "tab_17",
+                "tab_19"
+            ]
+        },
+        {
+            "heading": "G.3 Prompting LLMs with the Entire Book (EB)",
+            "text": "Prompting LLMs with large chunks (entire books) to evaluate the faithfulness of each claim is prohibitively expensive (see §G.5). Hence, for this experiment, we select 7 books based on:\n(1) token length (<125K), and ( 2) presence of at least one Unfaithful claim. This sub-dataset includes: (1) \"Yellowface,\" (2) \"Only For The Week,\" (3) \"Viciously Yours,\" (4) \"Six Scorched Roses,\" ( 5) \"Sorrow and Bliss,\" ( 6) \"She Is a Haunting,\" and ( 7) \"Pet.\" Table Table 31 shows the number of claims per label in the sub-dataset. Further details on each book can be found in Table 7.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_20",
+                "tab_10"
+            ]
+        },
+        {
+            "heading": "Claim verification with the entire books",
+            "text": "We prompt CLAUDE-3-OPUS and GPT-4-TURBO models with the entire book content and each claim in order to obtain the Faithful/Unfaithful labels.\nTable 32 presents a confusion matrix broken down by claim source (i.e., the model that generated the claim) and prediction model (CLAUDE-3-OPUS and GPT-4-TURBO). Figure 11 shows examples of misidentified labels by label-type and prediction model along with human labels and reasoning. Table 30 shows average precision (PR) and recall (RE) broken down by model and book.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_14"
+            ],
+            "table_ref": [
+                "tab_4",
+                "tab_19"
+            ]
+        },
+        {
+            "heading": "G.4 Ablation study",
+            "text": "Recall of the claim decomposition step we analyze the extracted claims on a subset of 20 summaries (371 sentences, 450 total extracted claims). We manually evaluate the quality of the extracted claims against the content of each summary. Calculating recall proved challenging due to the ambiguity in granularity (e.g., sentences, clauses, words). Notably, 3.8% of the 371 sentences in the 20 summaries were omitted in the extracted claims. Of these omissions, 85.7% were generic statements, and 14.3% were minor details. Additionally, we observed a small percentage of omissions at the sub-sentential level (e.g., clauses), which did not impact the narrative. All These omissions can be broadly categorized into two types.\n• Generic statements lacking substantive content: For instance, \"The narrative unfolds with intrigue, danger, and treacherous encounters\" appears in the summary but is omitted in extracted claims. Note that this sentence only addresses things already covered by other extracted claims in a generic way, so omitting it has few consequences.\n• Insignificant details that contribute little to the narrative: For instance, \"Altha, a 17-century woman, stands trial unjustly accused of witchcraft due to her remarkable healing abilities which are misunderstood by her village\" appears in the summary, but \"misunderstood by her village\" is omitted in the extracted claims. However, this is only a minor detail with little impact on the narrative.\nImportantly, we confirmed that none of these discrepancies between the summaries and the extracted claims led to criticisms regarding omissions, chronological errors, or factual inaccuracies in the annotators' summary-level free-form comments.\nAmelia carries the hidden burden of her identity throughout her life.\nFALSE: Amelia has no clue of her identity until Amos tells her and even then she doesn't fully believe it. Amelia believes she is a human.\nThe story emphasizes the complex role of social media in creating meaningful connections and facilitating change.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "FALSE:",
+            "text": "This set of summary claims are very focused on the idea of themes of digital age and the story doesn't cover that at all. Its not even based on a modern world.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "TRUE TRUE TRUE TRUE",
+            "text": "The relationship between Neil and Justine is strained due to the emotional struggles Neil is experiencing.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "FALSE: Justine's father is having emotional struggles but he doesn't blame Justine, he blames himself for not",
+            "text": "sensing what was going on. Justine's father assures her that he is not ashamed of her, and that Mrs Angela Price should be ashamed.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Justine successfully navigates her past experiences and gains a deep understanding of herself and her place in the world.",
+            "text": "TRUE: Justine is having difficulty coping with the loss of her dearest people but she manages to lead a successful life and she is greatly helped in doing so by her husband Dom. In 2014 Justine is visiting her father, he is in a retirement home because of his dementia, and she starts remembering the events from 1984, these events shaped her personality.\nFae traditions and politicking cause tensions in Rennick and Amelia's relationship.\nMartha's sister, Ingrid, is dealing with post-partum issues.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "FALSE TRUE FALSE TRUE FALSE FALSE TRUE:",
+            "text": "Because Amelia is a \"human\" there are a lot of uncertainties when it comes to marrying a royal or a fae.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Because she has no powers she has a target on her back and can be easily killed. Tradition is royals marry royals.",
+            "text": "No one has married a human before. The politics of royal fae marriage combined with Amelia being \"human\" make it so Rennick cannot tell anywho that Amelia is his mate, due to safety reasons. This is a major issue through the book.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "FALSE FALSE FALSE TRUE TRUE: Ingrid struggling after giving birth: \"She did cry then, telling me through tears that if I understood what it was like, being woken up fifty times a night and having to feed a baby every two hours when it takes an hour and fifty-nine minutes and feels like being stabbed in the nipple with four hundred knives, then I would be like, do you know what? I think I will just get my sister the liquorice she specifically likes.\"",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "FALSE TRUE FALSE: She doesn't struggle per se and nothing to show this mirrored in personal crisis and modern characters realisation.",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "TRUE: Martha talking to Robert, her psychiatrist: \"I said I don't want a baby. I would be a bad mother.\".",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Martha has a fear of becoming a mother.",
+            "text": "Lilith's struggles with her new vampire nature and revelations about her family's past are mirrored in the personal crises and realizations of the modern characters. Varying length of tokens used in BM25 As we increase the length of BM25-retrieved passages, the overall performance improves (Figure 12). However, this approach remains less effective for identifying unfaithful claims than our best performing method, i.e., prompting the model with the content of the entire book. This is likely due to the fact that even longer passages may not provide the entire context needed for verification of broader claims.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_15"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Reasoning type of false positive cases",
+            "text": "We analyzed failure cases in which our auto-rater experiment, conducted on seven books using CLAUDE-3-OPUS and GPT-4-TURBO incorrectly marked an Unfaithful claim as Faithful. We annotated the types of reasoning required to verify these claims, as presented in Table 33. The results indicate that approximately 75% of these failure cases necessitate multi-hop reasoning across the book. This is significantly higher than the overall distribution of 62.8% across the seven books, suggesting that our auto-raters struggle with multi-hop reasoning. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "G.5 API costs",
+            "text": "Generating book-length summaries The total cost of summarization for all 130 summaries amounted to about $288 USD. 18 Extracting claims The total cost of claim extraction for all 130 summaries amounted to about $8 USD, as the input and output sequence is relatively short.\nPrompting with the entire book This experiment costed roughly $720 USD for GPT-4-TURBO and $1070 USD for CLAUDE-3-OPUS (corresponding to the last two columns in Table 5).\nGPT-4-TURBO",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_7"
+            ]
+        },
+        {
+            "heading": "Summary",
+            "text": "In the epic narrative of \"Divine Rivals,\" we are introduced to Iris Winnow, a tenacious young woman propelled into the role of a war correspondent amidst a devastating conflict influenced by the ancient deities Enva and Dacre. Iris's journey into the heart of battle is not just professional but deeply personal, fueled by the disappearance of her beloved brother, Forest, who had enlisted to fight, and the anguish over her mother's demise. Her quest for truth and understanding is set against the backdrop of the war-torn Avalon Bluff, close to the war's front lines, where she encounters the stark realities of conflict, from the silent hope of a garden amidst destruction to the horror of wounded soldiers and the terror of artillery fire. Roman Kitt, previously Iris's rival at the Oath Gazette, emerges as a significant figure in her narrative, joining her as a fellow correspondent. Despite their history of competitive antagonism, their relationship evolves, highlighted by Roman's mysterious decision to leave behind a promising career and a broken engagement to be by Iris's side. Their dynamic is further complicated and enriched by their shared experiences on the battlefield and Roman's unspoken feelings for Iris, culminating in a poignant moment of sacrifice during a trench attack where Roman shields Iris with his body from a grenade explosion. Adding a magical element to the story, Iris maintains a correspondence with Carver, a mysterious figure, through enchanted typewriters. These letters offer Iris solace and a metaphysical connection that transcends the chaos surrounding her, underscoring themes of hope and connection. As the narrative unfolds, shocking revelations come to light. Forest, Iris's brother, believed to have been fighting for Enva, is discovered to have been forcefully conscripted by Dacre after a near-death experience. This discovery unfolds through a dramatic reunion where Forest saves Iris from one of Dacre's deadly gas attacks, only to reveal his changed allegiance by deceiving her and leaving Roman behind, presumed dead or captured. The heart of the story explores Iris and Roman's profound relationship, against the backdrop of war and divine manipulation. Moments from their past, including their secret wedding in a garden before a devastating attack by Dacre's forces, and Roman's heartfelt letter confessing his love, serve as poignant reminders of what they fight for. This emotional core is juxtaposed with the chaos of the present, wherein Iris must confront the betrayal of her brother and the uncertainty of Roman's fate. \"Divine Rivals\" delves into themes of love, loyalty, and the harrowing choices faced by individuals caught in the machinations of gods and war. Iris, within the turmoil of her personal and professional world, remains determined to uncover the truth, seeking to reclaim agency and hope amidst despair. Her journey is not just a search for her brother and Roman but an exploration of the resilience of the human spirit in the face of divine conflicts and the devastation of war. Through Iris's eyes, the story weaves a complex tapestry of human emotions, the indomitable will to survive, and the quest for truth in a reality marred by capricious gods and endless conflict.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Extracted Claims",
+            "text": "1. Iris Winnow is the main character in the book \"Divine Rivals.\" 2. Iris Winnow becomes a war correspondent during a conflict influenced by the deities Enva and Dacre.\n3. Iris's brother, Forest, has disappeared after enlisting to fight in the war. 4. Iris is devastated by her mother's death. 5. Iris's journey takes her to Avalon Bluff, a location close to the war's front lines. 6. Iris encounters the realities of war, including wounded soldiers and artillery fire. 7. Roman Kitt is a significant character in the narrative and joins Iris as a fellow war correspondent. 8. Roman Kitt was Iris's rival at the Oath Gazette before they became colleagues. 9. Their relationship evolves, despite a history of competitive antagonism. 10. Roman Kitt leaves a promising career and a broken engagement to join Iris. 11. Roman Kitt shields Iris from a grenade explosion during a trench attack. 12. Iris maintains a magical correspondence with a mysterious figure named Carver through enchanted typewriters.\n13. The letters from Carver offer Iris solace and a metaphysical connection. 14. Forest was believed to be fighting for deity Enva, but is revealed to have been forcefully conscripted by deity Dacre. 15. This revelation comes after Forest saves Iris from a gas attack by Dacre and then deceives her by leaving Roman behind. 16. Iris and Roman had a secret wedding in a garden before an attack by Dacre's forces. 17. Roman writes a letter confessing his love for Iris. 18. Iris must confront her brother's betrayal and uncertainty over Roman's fate. 19. Iris is determined to uncover the truth and reclaim agency and hope amidst despair. 20. Iris's journey is a search for her brother and Roman, and an exploration of human resilience in the face of conflict and divine manipulation. 21. The story of \"Divine Rivals\" explores themes of love, loyalty, and the difficult choices faced by individuals in times of war.\nTable 9: Example of a summary produced by GPT-4-TURBO along with the extracted set of claims for \"Divine Rivals,\" a novel by Rebecca Ross. Examples by the other models can be found in Table 8, Table 10, Table 11 and Table 12.\nGPT-3.5-TURBO",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_12",
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Summary",
+            "text": "In the city of Oath, siblings Iris and Forest Winnow face separation as Forest departs for war, leaving Iris to care for their mother. As Iris grapples with loneliness and worry, a fierce rivalry emerges at the Oath Gazette between Iris and Roman Kitt, two ambitious journalists. The backdrop of an impending war between the goddess Enva and god Dacre adds tension and intrigue to their lives. Iris, driven by a desire to prove herself in a male-dominated field, finds herself entangled in personal challenges while navigating her complicated relationship with Roman. As the war escalates and mysterious creatures surface, Iris and Roman become immersed in a world of gods, magic, and journalism, facing both personal and professional dilemmas. Iris decides to resign from her job to embark on a journey to find her brother Forest, who becomes entwined in the conflict. Roman, haunted by his past and familial obligations, struggles to reconcile his feelings for Iris while maintaining his journalistic integrity. Their paths eventually converge in Avalon Bluff, where Iris becomes a war correspondent equipped with a mysterious typewriter with a significant history. As Iris and Roman navigate the chaos of war, their interactions reveal deeper emotions and motivations, leading to a fateful meeting at a high-end restaurant. Attie, a friend of Iris, discloses her talent for playing the violin amidst the turmoil of war, adding a layer of depth to the narrative. Roman's vulnerability and inner turmoil are brought to the forefront when he is saved by Iris during an air raid, further strengthening their bond. As they confront personal and professional challenges amidst the impending battle, Iris reunites with Forest, only to discover his involvement with the opposing forces. Forest, torn between protecting Iris and confronting his past actions, adds a layer of complexity and tension to the story. Amidst the impending attack by Dacre, Iris and Roman make a decision to stay and assist in Avalon Bluff, preparing for the inevitable confrontation. The intertwining destinies of the characters unravel themes of sacrifice, resilience, and the search for identity in a world plagued by war and loss. As truths unfold, loyalty is tested, blurring the lines between good and evil. Characters like Dacre and Enva reveal sinister plans, setting the stage for a complex and emotional journey fraught with uncertainty and conflict. Through grief, rivalry, and love, Iris and Roman confront their vulnerabilities and ambitions, ultimately reshaping their destinies amidst the backdrop of war and its significant consequences.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "LABEL DEFINITION EXAMPLE (CLAIM // REASON)",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Claim type",
+            "text": "Event Concrete event where someone does something, something happens to someone, etc.\nMaggie reunites with her old friends and fellow retired spies. // Maggie does not reunite with these people.\nIntrospection Characters' thoughts, feelings, opinions, etc.\nJustine feels guilty about Amy's death and is haunted by the idea that Amy might be watching her. // Justine doesn't feel guilty.\nCause/effect Goals, motivation, or purposes Charlie Brown decides to return to New York to confront Harry Taylor and pursue a connection with Pete Makris after discovering Harry's infidelity. // He is not there to confront Harry.\nCauses or effects of events, actions, thoughts, etc.\nThe discovery of the love story sparks Jade's curiosity about the house and its past inhabitants. // Jade's curiosity is not sparked by the love story, but by a dream she had.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "State",
+            "text": "Relationship between characters Maggie reunites with her old friends and fellow retired spies. // Maggie does not reunite with these people.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Traits of a character",
+            "text": "The magic of royal fae in \"Viciously Yours\" manifests after twenty-five years. // It does not manifest after 25 years but becomes full strength at 25 years. They are born with magic.\nState of a character, place, etc. Phillip Hardwicke, a wealthy businessman who was believed to be dead, is revealed to be alive in the story. // Bella Hardwicke is revealed to be alive, not Phillip.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "High-level",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Characteristics of the narrative",
+            "text": "The narrative style of the book is non-linear and features flashbacks and switches between alternate worlds or viewpoints. // The book is almost exclusively from Aurelia's point of view and is linear.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "General story setting",
+            "text": "The narrative style of the book is non-linear and features flashbacks and switches between alternate worlds or viewpoints. // It's set in Adcova, Nyaxia is the name of the goddess.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Themes",
+            "text": "The narrative of \"The Guest\" explores themes of memory, identity, and the pursuit of understanding within human relationships. // It's set in Adcova, Nyaxia is the name of the goddess.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Reasoning type",
+            "text": "Direct Reasoning requires only one hop Alex attends a gathering at Victor's house. // The book states that the gathering is in Helen's house.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Indirect",
+            "text": "Reasoning requires more than one hop\nAlex and Jack bond over their shared experiences. // They don't have any shared experiences, Jack is from a wealthy, privileged home, and while we aren't told much about Alex's background, we know she doesn't live a cosseted life like him.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Annotator is arguing for a lack of support",
+            "text": "Maggie is portrayed as a skilled assassin in addition to being a former intelligence officer. // No information in the book really supports that.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Subjective",
+            "text": "Requires subjective judgment Forest is torn between his desire to protect Iris and confronting his past actions. // I don't think Forest makes any real effort to confront his past actions, his main motivation is protecting Iris.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Extra info",
+            "text": "Requires extra/meta information The book \"Wildfire\" is the first in the Icebreaker series. // No evidence in the book, but this is the second in the series, after \"Icebreaker\".\nTable 15: General scheme for assigning labels in our faithfulness annotation analysis along with more examples. This table complements Table 3.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_7",
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "Model Leaning Positive",
+            "text": "Leaning Negative",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "CLAUDE-3-OPUS",
+            "text": "This is an excellently structured summary. It communicates the main plot of the book in a succinct, organised manner, touching on all the pivotal moments in a logical sequence. There is a balance between story and commentary.\nAmelia's last name isn't very relevant to the summary. She is referred to by it once in the book.\nTaking out her last name would be more effective. Rennick's mother's death is also omitted which is a key point in the story. The other missing key point is that Amelia is believed to be a human. That has major implications and sets the stage for the events in the story. Overall this summary compared the first was a much better summary of the story because it contains key points and not generalizations.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "GPT-4-TURBO",
+            "text": "Overall, I think this is a good summary. It hits the major points of the book and the three stories are each in order. However, the book jumps back and forth between the three stories and this summary goes through each one separately. It also leaves out Violet drinking a tea that causes an abortion which is an important part of her character's. This is not a strong summary of the book. The entire section about visiting and living with Jerry is missing. There is no mention of the paparazzi pics being leaked. This summary seems to focus more on the message of the book rather than the plot. Many of the claims seems to be paraphrased versions of each other and keep repeating the same ideas of this book being about overcoming challenges, facing insecurities etc.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "GPT-4",
+            "text": "This summary is written in chronological order, it accurately categorizes the excerpt of Wreck the Halls and the claims mentioned here are either True or Partially True. It is easy to follow and is not repetitive. This is one of the stronger summaries. The claims were easy to verify and with the partially true claims -there were only minor issues. However, one aspect that is ignored in all the summaries including this one is the importance of Sumner's family. It touches on his view of his parents as a couple and his relationship with his grandmother. (...)\nThe majority of these claims were true, but the overall summary does a poor job of following the plot. It skips over many important plot points and does a poor job of describing the main characters. Similar to another one of the summaries, this one makes a lot of broad thematic claims but misses the overall storyline. If I hadn't read the book, I would not understand this summary.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "GPT-3.5-TURBO",
+            "text": "This is a good summary with most of the plot points covered. The chronological sequence is largely appropriate. Though I would move the claim about Sally and Noah's marriage closer to the conclusion as it happens at the end of the book. In one claim, Jerry is listed as he uncle, though he is her stepfather. I think there should also be a claim that Sally goes to live at Noah's place during the pandemic, as they get closer from their email exchanges. Otherwise, the summary communicates the heart of the book. This summary has a lot of issues including chronology problems, irrelevant information, and factual errors. Multiple claims draw from the acknowledgments and about the author section and these claims appear in the middle of the summary. Factual errors include that it is an assassin, not Diana that murders Gavin in Bangkok, Declan and Ingrid not being involved in past crimes in Malta, and Luther and Callie not having connections to Maggie's past. This summary misses some important points including that Maggie's husband was killed as a result of the Malta/ Cyrano mission.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "MIXTRAL",
+            "text": "The summary focuses on most of the key points mentioned in the story. It starts in chronological order and focuses on the evolvement of their relationship from a business arrangement towards a happily ever after. It describes the initial and final scenes well, including all relevant details. However, it misses certain events such as getting to know each other, the green card interview, first kiss (...). This is not a good summary and should not be used. there are too many false statements. Also, the jumping back and forth in the narrative makes it hard to follow. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "FACTUALITY",
+            "text": "Issues with factuality are explicitly mentioned by the annotator. Note that this category correlates partially with the annotated factuality errors.\nThere were some serious issues with this summary. The first being that the book is referred to as \"The Retirement Plan\" twice in the summary which is the incorrect title.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "OVEREMPHASIS",
+            "text": "Too much emphasis put on less significant events or characters.\nSalience: Charles is not an important character, he is the manager of the guest house where she stays in New York, and she only chats to him a couple of times.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "UNDEREMPHASIS",
+            "text": "Certain events or characters are mentioned but too little emphasis is put on their importance for the story.\nThere is not enough emphasis on the relationship between Justine and Dom, who later becomes her husband.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "VAGUE/GENERIC",
+            "text": "Vague or generic claims included in the summary.\nMost of the sentences at the end of the summary are generalized and there are no substantial facts.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "REPETITIVE",
+            "text": "Repetitive claims included in the summary.\nAs i noted in the annotations, claims 16 and 17 were repetitious and not necessary.\nDATA-INFLUENCED The summary was influenced by front and/or back matter.\n[n/a: judgment for this category was made by one of the co-authors during analysis]",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "COMPREHENSIVE",
+            "text": "The annotator praises the summary for being comprehensive.\nOut of all the summary claims, this feels the most relevant and comprehensive of the key events that take place.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "WELL-DONE",
+            "text": "The annotator praises the summary for being well-done.\nThis was good, things were in sequence, and the main points were covered. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "GPT-4-TURBO",
+            "text": "This set of summary claims are very focused on the idea of themes of digital age and the story doesn't cover that at all. Its not even based on a modern world. Chronology wasn't relevant as majority of the claims weren't correct, applicable or verifiable. Factuality was on zero and the claims don't cover any of the key events that occurs except that there was themes of life and death.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "NOTE:",
+            "text": "The model hallucinates information based on brief mentions of author's social media accounts.\n(...) Parallel to Lilith and Vale's journey, the story delves into the lives of modern city-dwellers: Alex, a budding Instagram influencer; Jordan, a TikTok content creator; Sam, a Twitter-using political activist; and Taylor, who leverages Facebook for business and family connections. Each character embodies the diverse ways social media influences the pursuit of fulfillment, showcasing the profound effects of these platforms on personal and collective experiences. (...) Themes of authenticity versus constructed online personas, the search for connectivity amidst digital isolation, and the double-edged sword of viral fame are explored, reflecting on the profound impacts of social media in modern society. (...) In summary, this narrative offers a comprehensive exploration of human experiences, spanning the ethereal and the digital. By paralleling the mystical journey of Lilith against the backdrop of a society deeply influenced by social media, the story invites readers into an immersive world where the boundaries between life and death blur, and where the quest for understanding and connection transcends the mortal coil and the digital divide. Through the intertwined lives of its characters, the story serves as a reflection on the complexities of the digital age, highlighting the profound and varied impacts of social media on the contemporary human condition.\nTable 24: Examples of summaries influenced by front/back matter information along with the annotators' comments. The CLAUDE-3-OPUS example was excluded from the analysis because the model failed to generate a summary. Although not ideal, this behavior is arguably better than the model fabricating content. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_5"
+            ]
+        },
+        {
+            "heading": "Acknowledgments",
+            "text": "We extend special gratitude to the Upwork annotators for their hard work, and to members from the UMass NLP lab for their feedback. This project was partially supported by awards IIS-2202506 and IIS-2312949 from the National Science Foundation (NSF) as well as an award from Adobe.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "GPT-4 Summary",
+            "text": "Divine Rivals is an intricate narrative set in a dystopian world at war, invoked by two resurrected rival deities, Enva and Dacre. The plot centres around Iris Winnow, a sensitive and tenacious employee at the Oath Gazette newspaper in the city of Oath, and her professional rival Roman Kitt. Iris's uneventful life spirals into chaos with her brother, Forest, joining the gods' war, leaving her with the responsibility of their alcoholic mother, Aster. Caught in a whirlpool of personal and professional rivalry, Iris's bond with Roman deepens in unexpected ways when Roman anonymously receives and responds to Iris's emotionally raw letters intended for Forest. Iris uses a magical vintage typewriter to send these letters, leading to an anonymous correspondence that amplifies their unspoken connection. Roman's social standing is a stark contrast to Iris's modest background; he is affianced to a high society woman, Elinor Little, and faces the challenges of striking a balance between his family's aspirations and his new role at Oath Gazette. Following their mother's sudden passing, Iris impulsively resigns from her job at Oath Gazette. Determined to locate Forest and report on the escalating gods' war, she accepts a position as a war correspondent with the Inkridden Tribune newspaper. Iris embarks on a perilous journey to Avalon Bluff, a town near the war front, accompanied by another correspondent, Thea \"Attie\" Attwood. Their hostess in the eerie town, Marisol Torres, warns the pair about the regular threats from different mythical creatures such as hounds and eithrals that desolate their surroundings. Roman's arrival in Avalon Bluff reignites their convoluted relationship. He assists Iris in documenting the harrowing realities of the war while managing the growing tension between them. As Roman becomes severely injured during a horrific encounter at the warfront, Iris, who has grown deeply involved in reporting the soldiers' personal narratives, fights her way to ensure his safety. This life-threatening event leads Iris to recognise Roman as Carver, her mysterious pen pal, triggering an intense turmoil of guilt and suspicion over Roman's subterfuge. Amid her growing concern for Roman's fate and her conflicted feelings about his deception, a shocking twist reveals that Forest, previously presumed dead, has survived and fought for Dacre, the enemy deity. Further ensuing chaos sees Roman disappear, leaving Iris trapped between her obligations towards her effectively traitorous brother and the desperate search for her missing love interest. \"Divine Rivals\" interweaves Iris's personal story of resilience and growth against the backdrop of an escalating war. As she metamorphoses from a correspondent to a key player in the war, Iris embodies the human spirit's ability to endure and adapt amidst adversity. The narrative encapsulates the strength of character, familial obligations, professional rivalries, societal norms, and profound transformations at the heart of the story. Despite the evolving relationships and hardships, Iris pledges to remain by Forest's side and continue her search for Roman. The story of \"Divine Rivals\" is a testament to human endurance, love, and loyalty amidst a surreal world at war.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "MIXTRAL Summary",
+            "text": "In a world torn by a devastating war between two divine families, the Skywards and the Underlings, \"Divine Rivals\" follows the journey of Iris Winnow, an orphaned junior reporter at the Oath Gazette in the city of Oath, as she strives to become a renowned journalist and uncover the truth about the war that took her mother and brother, Forest, from her. The Skywards and Underlings' conflict has left the realm of Cambria in chaos, where magic and mythology intertwine with the mortal world, and gods walk among humans. Iris' dream of becoming a great journalist is fueled by her love for her late brother and her desire to understand why he joined the war. She faces fierce competition from her professional rival, Roman Kitt, a talented storyteller hailing from a wealthy family. While Iris longs to write about significant issues, Roman, who shares a complicated background with Iris, excels in storytelling and is being pressured by his father to join the family business. Zeb Autry, the editor of the Oath Gazette, is reluctant to cover the war, much to Iris' dismay. Iris' family is burdened with financial difficulties and personal struggles after losing her mother and brother to the war. Driven by her determination to uncover the truth about the war and her late brother's involvement, Iris finds solace in her resolve. The Inkridden Tribune, a rival newspaper, announces an opportunity for war correspondents, enticing Iris to compete with Roman for the position. Iris's journey is further complicated by her mysterious correspondence with an unknown person who leaves her letters in her wardrobe, forming a unique bond. As Iris competes for the position, she reflects on her past and her friendship with Forest, who introduced her to the world of journalism. Their differing views on the war and the Skyward goddess, Enva, drove them apart. Iris wanted to highlight the bravery of soldiers, while Forest aimed to reveal Enva's manipulation of young minds to fuel the war. Despite the challenges, Iris remains focused on her goal and finally manages to land a job as a war correspondent for the Inkridden Tribune. She embarks on a dangerous journey to cover the war, facing various dangers and hardships along the way. Iris continues to write letters to the mysterious stranger, who becomes her confidante and support system during her perilous journey. Meanwhile, the town of Avalon Bluff prepares for an impending battle against an unknown enemy -Dacre, the god of the Underlings. Iris, Roman, and other companions gather in Avalon Bluff to aid the town's defense, as tensions rise with the theft of emergency supply kits and Keegan's distracted behavior. Amidst the chaos, Iris and Roman rekindle their connection, and Roman proposes to Iris, offering a moment of hope in the face of devastation. As the group prepares for battle, Iris witnesses firsthand the horrors of war, including the loss of innocent lives and the destruction of her childhood home, Clover Hill. Despite the pain, Iris continues to report on the war, using her words to both document the battles and search for Forest. \"Divine Rivals\" is a compelling narrative that explores themes of identity, courage, and the power of words in the face of war. Iris' unwavering determination to make a difference by writing about the truth, seeking answers about her brother, and making her mark as a journalist resonates throughout the story. The author extends gratitude towards the individuals who helped her publish this captivating tale, acknowledging her literary agent, film agent, subrights team, editors, cover designer, copy editor, and fellow authors.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Claim Extraction Template",
+            "text": "You are trying to verify the faithfulness of statements made in a given summary of a book against the actual text of the book. To do so, you first need to break the summary into a set of \"atomic claims\", each of which will then be passed to a human who will read the book and verify if the claim is true or not. Each atomic claim must be fully understandable without any other context from the summary (e.g., all entities must be referred to by name, not pronoun), and they must be situated within relevant temporal, location, and causal context whenever possible. Try to keep each atomic claim to a maximum of 2 sentences. Each atomic claim is separated with '-'.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Summary:",
+            "text": "List of atomic claims:",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluation Template",
+            "text": "You are provided with a context and a statement. Your task is to carefully read the context and then determine whether the statement is true or false. Use the information given in the context to make your decision.   This summary excluded a lot of the main plot points (...) and the very important principal antagonists Alma, Thomas, and Marion. Alma and Thomas are present-day representations of colonization and investors in the project to turn Nhà Hoa into a bed-andbreakfast.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "EVENTS",
+            "text": "Summary fails to mention important events and/or turning points.\nSome important events in the book were omitted, such as the part where Alex follows a group of young people to a house and has sex with a girl's boyfriend, the part where she sneaks into a club and pretends to be a little boy's nanny, and the part where she follows Margaret to her home. These events are filled with tension, showcase Alex's daring exploits, add a deeper layer of meaning to the story, and ultimately propel the narrative, so they should have been included. Alex almost drowns in the beginning of the novel, a frightening incident that she mentions to Victor during the party.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ATTRIBUTES",
+            "text": "Summary fails to mention attributes -details about the events, interac-\n(...) but the overall summary misses a huge plot point of Carver and Roman being the same person.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "RELATIONS",
+            "text": "Summary fails to mention specific relationships between the characters which are important to the plot.\nThere is no mention of Clover and Amos the Desert King being mates. Nor Fawn and Dean the Garden King being mates. THEMES Summary fails to depict main/important themes of the novel.\nWater, pools, and beaches are recurring metaphors in the book, yet they aren't mentioned or highlighted in any of the claims.   ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Anthropic. Model Card: Claude 3. Technical report, Anthropic",
+            "journal": "",
+            "year": "2023",
+            "authors": ""
+        },
+        {
+            "ref_id": "b1",
+            "title": "Attributed question answering: Evaluation and modeling for attributed large language models",
+            "journal": "",
+            "year": "2022",
+            "authors": "Bernd Bohnet; Pat Vinh Q Tran; Roee Verga; Daniel Aharoni;  Andor; Baldini Livio; Massimiliano Soares; Jacob Ciaramita; Kuzman Eisenstein; Jonathan Ganchev;  Herzig"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Hallucinated but factual! inspecting the factuality of hallucinations in abstractive summarization",
+            "journal": "",
+            "year": "2021",
+            "authors": "Mengyao Cao; Yue Dong; Jackie Chi; Kit Cheung"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Speak, memory: An archaeology of books known to ChatGPT/GPT-4",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023-12",
+            "authors": "Kent Chang; Mackenzie Cramer; Sandeep Soni; David Bamman"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Booookscore: A systematic exploration of book-length summarization in the era of llms",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yapei Chang; Kyle Lo; Tanya Goyal; Mohit Iyyer"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Summscreen: A dataset for abstractive screenplay summarization",
+            "journal": "",
+            "year": "2022",
+            "authors": "Mingda Chen; Zewei Chu; Sam Wiseman; Kevin Gimpel"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Bayesian summarization at duc and a suggestion for extrinsic evaluation",
+            "journal": "",
+            "year": "2005",
+            "authors": "Hal Daumé; D Marcu"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Enabling large language models to generate text with citations",
+            "journal": "",
+            "year": "2023",
+            "authors": "Tianyu Gao; Howard Yen; Jiatong Yu; Danqi Chen"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Gemini 1.5: Unlocking multimodal understanding across millions of tokens of context",
+            "journal": "",
+            "year": "2024",
+            "authors": "Google Gemini; Team "
+        },
+        {
+            "ref_id": "b9",
+            "title": "Non-expert evaluation of summarization systems is risky",
+            "journal": "Association for Computational Linguistics",
+            "year": "2010-06",
+            "authors": "Dan Gillick; Yang Liu"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Evaluating factuality in generation with dependency-level entailment",
+            "journal": "",
+            "year": "2020-11",
+            "authors": "Tanya Goyal; Greg Durrett"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Annotating and modeling fine-grained factuality in summarization",
+            "journal": "",
+            "year": "2021",
+            "authors": "Tanya Goyal; Greg Durrett"
+        },
+        {
+            "ref_id": "b12",
+            "title": "",
+            "journal": "",
+            "year": "2024",
+            "authors": "Albert Q Jiang; Alexandre Sablayrolles; Antoine Roux; Arthur Mensch; Blanche Savary; Chris Bamford; Devendra Singh Chaplot; Diego De Las Casas; Emma Bou Hanna; Florian Bressand; Gianna Lengyel; Guillaume Bour; Guillaume Lample; Renard Lélio; Lucile Lavaud; Marie-Anne Saulnier; Pierre Lachaux; Sandeep Stock;  Subramanian"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Real-world entailment for claims in wikipedia",
+            "journal": "",
+            "year": "2023",
+            "authors": "Ryo Kamoi; Tanya Goyal; Juan ; Diego Rodriguez; Greg Durrett;  Wice"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Needle in a haystack",
+            "journal": "",
+            "year": "",
+            "authors": "Greg Kamradt"
+        },
+        {
+            "ref_id": "b15",
+            "title": "",
+            "journal": "",
+            "year": "2023",
+            "authors": " Needleinahaystack"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Guidelines for human evaluation of faithfulness in long-form summarization",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023-05",
+            "authors": "Kalpesh Krishna; Erin Bransom; Bailey Kuehl; Mohit Iyyer; Pradeep Dasigi; Arman Cohan; Kyle Lo"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Evaluating the factual consistency of abstractive text summarization",
+            "journal": "Association for Computational Linguistics",
+            "year": "2020-11",
+            "authors": "Wojciech Kryscinski; Bryan Mccann; Caiming Xiong; Richard Socher"
+        },
+        {
+            "ref_id": "b18",
+            "title": "BOOKSUM: A collection of datasets for long-form narrative summarization",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022-12",
+            "authors": "Wojciech Kryscinski; Nazneen Rajani; Divyansh Agarwal; Caiming Xiong; Dragomir Radev"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Exploring content selection in summarization of novel chapters",
+            "journal": "Association for Computational Linguistics",
+            "year": "2020",
+            "authors": "Faisal Ladhak; ; Faisal Ladhak; Bryan Li; Yaser Al-Onaizan; Kathleen Mckeown"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Same task, more tokens: the impact of input length on the reasoning performance of large language models",
+            "journal": "",
+            "year": "2024",
+            "authors": "Mosh Levy; Alon Jacoby; Yoav Goldberg"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Unveiling the essence of poetry: Introducing a comprehensive dataset and benchmark for poem summarization",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023-12",
+            "authors": "Ridwan Mahbub; Ifrad Khan; Samiha Anuva; Md Shihab Shahriar; Md Tahmid Rahman Laskar; Sabbir Ahmed"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Selfcheckgpt: Zero-resource black-box hallucination detection for generative large language models",
+            "journal": "EMNLP",
+            "year": "2023",
+            "authors": "Potsawee Manakul; Adian Liusie; Mark Jf Gales"
+        },
+        {
+            "ref_id": "b23",
+            "title": "On faithfulness and factuality in abstractive summarization",
+            "journal": "Association for Computational Linguistics",
+            "year": "2020-07",
+            "authors": "Joshua Maynez; Shashi Narayan; Bernd Bohnet; Ryan Mcdonald"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Factscore: Fine-grained atomic evaluation of factual precision in long form text generation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Sewon Min; Kalpesh Krishna; Xinxi Lyu; Mike Lewis; Wen-Tau Yih; Pang Wei Koh; Mohit Iyyer; Luke Zettlemoyer; Hannaneh Hajishirzi"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Fine-grained hallucination detection and editing for language models",
+            "journal": "",
+            "year": "2024",
+            "authors": "Abhika Mishra; Akari Asai; Vidhisha Balachandran; Yizhong Wang; Graham Neubig; Yulia Tsvetkov; Hannaneh Hajishirzi"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Evaluating content selection in summarization: The pyramid method",
+            "journal": "Association for Computational Linguistics",
+            "year": "2004-05-07",
+            "authors": "Ani Nenkova; Rebecca Passonneau"
+        },
+        {
+            "ref_id": "b27",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b28",
+            "title": "Understanding factuality in abstractive summarization with FRANK: A benchmark for factuality metrics",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021-06",
+            "authors": "Artidoro Pagnoni; Vidhisha Balachandran; Yulia Tsvetkov"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Okapi at trec-3",
+            "journal": "NIST Special Publication SP",
+            "year": "1995",
+            "authors": "Stephen E Robertson; Steve Walker; Susan Jones; Micheline M Hancock-Beaulieu; Mike Gatford"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Get your vitamin C! robust fact verification with contrastive evidence",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021-06",
+            "authors": "Tal Schuster; Adam Fisch; Regina Barzilay"
+        },
+        {
+            "ref_id": "b31",
+            "title": "URL",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b32",
+            "title": "Reading subtext: Evaluating large language models on short story summarization with writers",
+            "journal": "",
+            "year": "2024",
+            "authors": "Melanie Subbiah; Sean Zhang; Lydia B Chilton; Kathleen Mckeown"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Evaluating hallucinations of llms on topic-focused dialogue summarization",
+            "journal": "",
+            "year": "2024",
+            "authors": "Liyan Tang; Igor Shalyminov; Amy Wing-Mei Wong; Jon Burnsky; Jake W Vincent; Yu'an Yang; Siffi Singh; Song Feng; Hwanjun Song; Hang Su"
+        },
+        {
+            "ref_id": "b34",
+            "title": "FEVER: a large-scale dataset for fact extraction and VERification",
+            "journal": "Association for Computational Linguistics",
+            "year": "2018-06",
+            "authors": "James Thorne; Andreas Vlachos; Christos Christodoulopoulos; Arpit Mittal"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Fine-tuning language models for factuality",
+            "journal": "",
+            "year": "2023",
+            "authors": "Katherine Tian; Eric Mitchell; Huaxiu Yao; Christopher D Manning; Chelsea Finn"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Fact or fiction: Verifying scientific claims",
+            "journal": "Association for Computational Linguistics",
+            "year": "2020-11",
+            "authors": "David Wadden; Shanchuan Lin; Kyle Lo; Lucy Lu Wang; Madeleine Van Zuylen; Arman Cohan; Hannaneh Hajishirzi"
+        },
+        {
+            "ref_id": "b37",
+            "title": "SQuALITY: Building a long-document summarization dataset the hard way",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022-12",
+            "authors": "Alex Wang; Richard Yuanzhe Pang; Angelica Chen; Jason Phang; Samuel R Bowman"
+        },
+        {
+            "ref_id": "b38",
+            "title": "Long-form factuality in large language models",
+            "journal": "",
+            "year": "2024",
+            "authors": "Jerry Wei; Chengrun Yang; Xinying Song; Yifeng Lu; Nathan Hu; Dustin Tran; Daiyi Peng; Ruibo Liu; Da Huang; Cosmo Du; Quoc V Le"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Recursively summarizing books with human feedback",
+            "journal": "",
+            "year": "2021",
+            "authors": "Jeff Wu; Long Ouyang; Daniel M Ziegler; Nisan Stiennon; Ryan Lowe; Jan Leike; Paul Christiano"
+        },
+        {
+            "ref_id": "b40",
+            "title": "Extracted Claims 1. Divine Rivals is a narrative set in a dystopian world at war",
+            "journal": "",
+            "year": "2023",
+            "authors": "Rongxin Zhu; Jianzhong Qi; Jey Han Lau"
+        },
+        {
+            "ref_id": "b41",
+            "title": "The war in the world of \"Divine Rivals\" is invoked by two resurrected rival deities",
+            "journal": "Enva and Dacre",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b42",
+            "title": "The story's plot focuses on Iris Winnow, an employee at the Oath Gazette newspaper in the city of Oath",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b43",
+            "title": "Iris Winnow has a professional rival named Roman Kitt",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b44",
+            "title": "Iris Winnow's brother, Forest, joins the god's war",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b45",
+            "title": "Iris Winnow is left with the responsibility of their alcoholic mother",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b46",
+            "title": "Iris Winnow's bond with Roman Kitt deepens when Roman anonymously receives and responds to Iris's letters intended for Forest",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b47",
+            "title": "Iris Winnow uses a magical vintage typewriter to send letters to Roman Kitt",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b48",
+            "title": "Roman Kitt is engaged to a high society woman named Elinor Little",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b49",
+            "title": "Roman Kitt faces challenges balancing his family's aspirations and his role at the Oath Gazette. 12. Iris Winnow resigns from her job at the Oath Gazette after their mother's sudden death. 13. Iris Winnow accepts a position as a war correspondent with the Inkridden Tribune newspaper. 14. Iris Winnow journeys to Avalon Bluff, a town near the war front",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b50",
+            "title": "Avalon Bluff, Marisol Torres warns Iris Winnow and Thea Attwood about the regular threats from mythical creatures",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b51",
+            "title": "Roman Kitt arrives in Avalon Bluff and assists Iris Winnow in documenting the war",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b52",
+            "title": "Roman Kitt is severely injured during an encounter at the warfront",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b53",
+            "title": "Iris Winnow realizes Roman Kitt is Carver, her mysterious pen pal, after he is severely injured. 19. Iris Winnow feels guilt and suspicion over Roman Kitt's deception",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b54",
+            "title": "It is revealed that Forest, previously assumed dead, survived and fought for Dacre, the enemy deity",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b55",
+            "title": "Roman Kitt disappears, leaving Iris Winnow torn between her obligations towards her brother and the search for Roman",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b56",
+            "title": "Iris Winnow pledges to stay by her brother's side and continue her search for Roman Kitt. 24. The story of \"Divine Rivals\" is a testament to human endurance, love, and loyalty during a war",
+            "journal": "Examples by the other models can be found in Table",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b57",
+            "title": "Forest Winnow departs for war and Iris stays behind to care for their mother",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b58",
+            "title": "Iris struggles with feelings of loneliness and worry",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b59",
+            "title": "At the Oath Gazette, a fierce rivalry develops between Iris and Roman Kitt, both of whom are ambitious journalists",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b60",
+            "title": "An impending war between the goddess Enva and god Dacre adds tension and intrigue to Iris and Roman's lives",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b61",
+            "title": "Iris aims to prove herself in the male-dominated field of journalism",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b62",
+            "title": "Iris faces personal challenges while navigating her complicated relationship with Roman",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b63",
+            "title": "As the war intensifies, Iris and Roman encounter mysterious creatures",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b64",
+            "title": "Iris resigns from her job at the Oath Gazette to search for her brother Forest",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b65",
+            "title": "Roman Kitt has a troubled past and family obligations that make it difficult for him to balance his feelings for Iris and his journalistic integrity",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b66",
+            "title": "Iris and Roman's paths intersect in Avalon Bluff, where Iris becomes a war correspondent. 12. Iris uses a typewriter with a significant past while working as a war correspondent",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b67",
+            "title": "Iris and Roman's interactions during the war reveal deeper emotions and motivations",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b68",
+            "title": "Iris and Roman have a significant meeting at a high-end restaurant",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b69",
+            "title": "Roman's vulnerability is revealed when Iris saves him during an air raid",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b70",
+            "title": "Iris reunites with Forest during the war, discovering his involvement with the opposing forces",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b71",
+            "title": "Amidst the approaching attack by Dacre, Iris and Roman decide to stay and help in Avalon Bluff. 20. The characters' intertwining destinies reveal themes of sacrifice, resilience, and identity search in a war-torn world",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b72",
+            "title": "The story explores blurred lines between good and evil as loyalties are tested. 22. Characters like Dacre and Enva have sinister plans",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b73",
+            "title": "Iris and Roman confront their vulnerabilities and ambitions, leading to a change in their destinies amid the backdrop of war",
+            "journal": "Examples by the other models can be found in Table",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b74",
+            "title": "Divine Rivals is set in a world affected by a war between two divine families, the Skywards and the Underlings",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b75",
+            "title": "The protagonist of \"Divine Rivals\" is Iris Winnow, an orphan who works as a junior reporter at the Oath Gazette in the city of Oath",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b76",
+            "title": "Iris Winnow's aspiration to become a renowned journalist is driven by her desire to uncover the truth about the war that resulted in the death of her mother and brother",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b77",
+            "title": "The conflict between the Skywards and the Underlings has caused chaos in the realm of Cambria, a place where magic and mythology interact with the mortal world",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b78",
+            "title": "Iris Winnow has a professional rival named Roman Kitt, a skilled storyteller from a wealthy family",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b79",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "Roman "
+        },
+        {
+            "ref_id": "b80",
+            "title": "the editor of the Oath Gazette, does not want to cover the war",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b81",
+            "title": "After the loss of her mother and brother, Iris Winnow's family is facing financial and personal struggles",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b82",
+            "title": "The Inkridden Tribune, a competing newspaper, advertises a job for war correspondents, leading both Iris Winnow and Roman Kitt to compete for the position",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b83",
+            "title": "Iris Winnow maintains a mysterious correspondence with an unidentified individual who leaves her letters in her wardrobe",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b84",
+            "title": "Iris Winnow's brother, Forest, introduced her to journalism",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b85",
+            "title": "Iris Winnow and her brother Forest had differing views on the war and the Skyward goddess, Enva. 13. Despite various challenges, Iris Winnow achieves her goal of becoming a war correspondent for the Inkridden Tribune",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b86",
+            "title": "the god of the Underlings",
+            "journal": "",
+            "year": "",
+            "authors": " Dacre"
+        },
+        {
+            "ref_id": "b87",
+            "title": "Amidst the chaos, Iris Winnow and Roman Kitt rekindle their connection, and Roman Kitt proposes to Iris Winnow",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b88",
+            "title": "Iris Winnow experiences the horrors of war firsthand, including the loss of innocent lives and the destruction of her childhood home",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b89",
+            "title": "Despite the hardships, Iris Winnow continues to report on the war, using her writing to document the battles and search for her brother",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b90",
+            "title": "Divine Rivals explores themes of identity, courage, and the power of words during war",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b91",
+            "title": "Iris Winnow's determination to make a difference by writing about the truth and seeking answers about her brother is a central theme in",
+            "journal": "Divine Rivals",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b92",
+            "title": "The author of \"Divine Rivals\" acknowledges her literary agent, film agent, subrights team, editors, cover designer, copy editor, and fellow authors for their assistance in publishing the book",
+            "journal": "Table",
+            "year": "",
+            "authors": ""
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 1 :1Figure 1: Our pipeline for collecting faithfulness annotations in book-length summarization (FABLES). First, (a) we generate summaries through hierarchical merging. Next, (b) we prompt GPT-4 to extract decontextualized claims. Finally, (c) we conduct a human evaluation of these claims, requiring annotators to validate each claim and provide their reasoning and evidence for the assigned label.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 2 :2Figure 2: Example summary generated by CLAUDE-3-OPUS and claims extracted by GPT-4.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Patrick have been married for eight years.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 3 :3Figure 3: Examples of mistakes in label prediction made by CLAUDE-3-OPUS and GPT-4-TURBO accompanied by annotator labels and reasoning. More examples can be found in Figure 11.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 4 :4Figure 4: Percentage of summaries flagged by the annotators for one of five omission errors, characters, events, attributes, relationships, and themes, by model.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Our paper builds on prior work in narrative summarization, including short stories(Wang et al., 2022; Subbiah et al., 2024), poetry(Mahbub et al., 2023), screenplays(Chen et al., 2022), among others. Wu et al. (2021) demonstrated how an LLM can overcome long context to summarize books, like those in the BookSum (Kryscinski et al., 2022) dataset. Closely related to our work is Chang et al. (2023b), but while they focus on evaluating summary coherence (which requires only judging the model generation), we address faithfulness and content selection (which requires relating model generations back to the long source inputs). Faithfulness and content selection in summarization: Our paper builds on prior work in evaluating hallucination and inconsistency in summarization (Maynez et al., 2020; Kryscinski et al., 2020; Ladhak, 2024) which are even challenging for humans (Daumé & Marcu, 2005). Pagnoni et al. (2021) introduce the FRANK dataset, where they use human annotations of generated summaries to produce a taxonomy of factual errors based on linguistic analysis, resembling the work of Goyal & Durrett (2020) and Goyal & Durrett (2021). Closest to our work, Krishna et al. (2023) perform human evaluation of faithfulness on summaries of short stories, whereas we study book-length inputs. Our exploration of omission errors is rooted in prior research on content selection (Nenkova & Passonneau, 2004; Gillick & Liu, 2010; Ladhak et al., 2020). Claim verification for evaluating summaries: Our paper also relates to prior work on claim verification, where claims are verified given reference to some knowledge source (Thorne et al., 2018; Wadden et al., 2020; Schuster et al., 2021). Min et al. (2023) propose FActScore, an LLM-based metric of factual precision in biography generation, which was expanded upon in SAFE (Wei et al., 2024). Manakul et al. (2023) propose SelfCheckGPT, which uses LLMs to evaluate the faithfulness of GPT-3 generated texts on a dataset of Wikipedia-style passages about people.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_7",
+            "figure_caption": "Your job is to validate the factuality of claims made within an AI-generated book summary. You will be given a list of claims derived from a book summary along with the text of the book itself. Your task is to decide whether or not each claim is supported by the book, and provide evidence from the book to justify your decisions. You should also comment broadly on major omissions, salience issues, and errors with the chronology of events within the list of claims. To finish the text, you must (1) annotate every claim for factuality and (2) write a broad comment about the provided list of claims. Make sure you have closely read the entire book prior to starting the annotation process. While we do provide the text of the book along with a simple search functionality, our expectation is that you will not need to re-read the book to assess the factuality of most claims. II. Accessing the interface 1. Go to the link you gave via Upwork message. 2. Look for the file labeled \"upwork-[number 1 to 5]-[book_name].html.\" 3. You will be given 5 different claims from the same book. Let's start annotating them!",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_8",
+            "figure_caption": "Figure 5 :5Figure 5: Instructions for annotation task described in §2 .",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_9",
+            "figure_caption": "Figure 7 :7Figure 7: Pop-up window showing the interface where the annotators have to select the faithfulness label supplemented by free-form reasoning and evidence extracted from the book..",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "figure",
+            "figure_id": "fig_10",
+            "figure_caption": "Figure 8 :8Figure 8: Pop-up window prompting the annotator to provide a free-form comment on the quality of summary claims highlighting omissions, salience, chronology, and factuality issues..",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "figure",
+            "figure_id": "fig_11",
+            "figure_caption": "Figure 9 :9Figure 9: Percentage of claims rated Unfaithful or Partially Supported across models, analyzed by book. Only four (4) out of 130 summaries were 100% Faithful. In two cases, CLAUDE-3-OPUS declined to merge two summaries due to significant content discrepancies (\"Same Time Next Year\" and \"The Guest\").",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_12",
+            "figure_caption": "C l a u d e - 3 -3",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "figure",
+            "figure_id": "fig_13",
+            "figure_caption": "Figure 10 :10Figure 10: Percentage summaries affected by specific issue mentioned in comments by model.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "figure",
+            "figure_id": "fig_14",
+            "figure_caption": "Figure 11 :11Figure 11: Examples of claims accompanied by annotator labels and reasoning, along with predictions made by CLAUDE-3-OPUS and GPT-4-TURBO.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "12",
+            "figure_type": "figure",
+            "figure_id": "fig_15",
+            "figure_caption": "Figure 12 :12Figure 12: F1 score varying chunk size for BM25.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "",
+            "figure_caption": "",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "",
+            "figure_data": "GPT-3.5-TURBO2,04823.23 3.2971.5211.2613.084.14MIXTRAL GPT-4 72,048 2,04827.50 4.61 26.23 3.5468.67 78.1511.47 4.5517.2 15.982.66 1.32GPT-4-TURBO100,00021.65 2.3577.627.6412.082.66CLAUDE-3-OPUS180,00022.85 4.8790.892.16.650.35"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Percentage of claims extracted from LLM-generated summaries rated by humans as faithful, unfaithful, partial support or can't verify. Chunk size denotes the token count per chunk used for summarization across models; we also include the mean and standard deviation of claim counts in generated summaries. Please note that the percentage of each label for CLAUDE-3-OPUS is calculated from 24 out of 26 books. The model was unable to merge summaries for two books due to content discrepancies.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Taxonomy of faithfulness errors with respect to claim type and reasoning type in FABLES.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "Annotator comments highlighting the challenges in evidence retrieval.",
+            "figure_data": "Discussion: It is generally agreed that benchmarking the faithfulness of LLM-generatedtext is important. However, recent efforts have primarily focused on verifying entity-centricfacts (Min et al., 2023). Our work, and others (Zhu et al., 2023; Tang et al., 2024; Mishra et al.,2024), show that these do not provide coverage over all types of LLM errors, especiallyin more challenging settings like book summarization. Moreover, the retrieve-then-verifyframework that forms the backbone of most past evaluation techniques (Bohnet et al., 2022;"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "",
+            "figure_data": "GPT-3.5-TURBO0.3960.2480.6860.3690.8010.3730.8870.3570.9290.619MIXTRAL0.2480.1780.7600.3610.8070.3120.9460.4400.9620.645GPT-40.3370.1460.6570.2290.7390.1620.9090.2300.9590.600GPT-4-TURBO0.2610.2170.6800.2640.7940.2410.9180.1090.9450.600CLAUDE-3-OPUS0.2420.0180.5100.0220.6920.0000.9620.0000.9710.000Overall0.3050.1670.6750.2590.7790.2490.9320.3860.9550.582"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "F1 scores for Faithful and Unfaithful label across models with evaluators on 7 books.",
+            "figure_data": "The best results of each label are in bold. Entire Book refers to the entire book methodevaluating faithfulness from large (125k) chunks using either GPT-4-TURBO or CLAUDE-3-OPUS.5"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_8",
+            "figure_caption": "",
+            "figure_data": "As book-length summarization is still a nascent area, research into other error types beyondcoherence (Chang et al., 2023b) and faithfulness ( §3) is still lacking. In this section, weperform qualitative coding over all 130 free-form, summary-level comments from FABLESand present a taxonomy of content selection errors (e.g., omissions) that may prove moredifficult to detect than faithfulness. 10"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "",
+            "figure_data": "5-TURBO MIXTRAL"
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_10",
+            "figure_caption": ", Table10, Table11, and Table12. Details of the 26 books used for summaries. Length of each book is provided in tokens as computed with tiktoken.",
+            "figure_data": "TITLEAUTHORGENDER GENRELENGTHPUBLICATION LANGA Haunting on the HillElizabeth HandFhorror, Gothic117,577Oct 3, 2023AmEAgency for ScandalLaura WoodFhistorical fiction,116,809Jan 5, 2023BrEmystery, romanceDivine RivalsRebecca RossFfantasy, romance,137,616Apr 4, 2023AmEyoung adultFairytale of New YorkZoë FolbiggFromance134,369Aug 28, 2023 BrEFlawlessElsie SilverFromance119,580Jun 24, 2022CanEFourth WingRebecca YarrosFfantasy243,965May 2, 2023AmEModern DivinationIsabel AgajanianFurban fantasy167,568Jan 30, 2023AmEOnly for the WeekNatasha BishoFAfrican American87,056May 11, 2023 AmEromancePetCatherineFthriller, mystery124,679July 13, 2023 NZEChidgeyRomantic ComedyCurtis SittenfeldFromance116,560Apr 4, 2023AmESame Time Next YearTessa BaileyFromance49,762Dec 1, 2023AmEShe is a HauntingTrang Thanh TranFromance106,659Feb 28, 2023AmESix Scorched RosesCarissa BroadbentFfantasy romance54,481Mar 21, 2023 AmESorrow and BlissMeg MasonFmental health112,468Sep 2, 2020AusEThe Atonement Murders Jenifer RuffFmystery, thriller105,493Apr 14, 2023 AmEThe GuestEmma ClineFthriller89,977May 16, 2023 AmEThe Marriage ActJohn MarrsMthriller, mystery,135,901Jan 19, 2023BrEdystopiaThe Spy CoastTess GerritsenFmystery, thriller128,918Nov 1, 2023AmEThe WagerDavid GrannMnonfiction,156,022Apr 18, 2023 AmEhistoricalThe White LadyJacquelineFhistorical fiction,126,051Mar 21, 2023 BrEWinspearmysteryThis ImpossibleJessica BryantFmystery, fantasy119,115Feb 1, 2024AmEBrightnessKlagmannViciously YoursJamie ApplegateFfantasy, romance86,774Jan 23, 2024AmEHunterWeywardEmilia HartFhistorical fiction,128,728Feb 2, 2023AusEfantasyWildfireHannah GraceFromance, sport140,060Oct 3, 2023BrEYellowfaceR.F. KuangFthriller114,346May 25, 2023 AmEYou, AgainKate GoldbeckFromance137,624Sep 12, 2023AmE"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_11",
+            "figure_caption": "Iris Winnow, an aspiring writer, works at the Oath Gazette newspaper in the city of Oath, competing with her rival Roman Kitt for a columnist position. Iris's brother Forest is fighting in a war between the gods Enva and Dacre. She hasn't heard from him in months and decides to become a war correspondent to find him. Iris and Roman develop feelings for each other through letters they exchange via enchanted typewriters, not realizing they are writing to each other. Roman, engaged to Elinor Little through an arranged marriage by his father, breaks off the engagement and follows Iris to the war front. In the town of Avalon Bluff near the front lines, Iris stays with Marisol, who runs a bed and breakfast, and befriends fellow correspondent Attie. Roman arrives and he and Iris fall in love, getting married just before an attack on the town by Dacre's forces. During the attack, Iris is saved by a disguised soldier who she later realizes is her brother Forest. Forest, who was supposed to have died from his wounds but was healed by Dacre, deserted and has been fighting for the enemy. In the chaos, Iris is separated from Roman, who is badly wounded. Iris and Forest return to Oath, where Iris learns the full story of Forest's service to Dacre. She discovers a letter from Roman in her room, confirming he knew her identity while writing to her. Meanwhile, the god Dacre finds the dying Roman on the battlefield and, sensing his strong spirit, decides to take him to heal his wounds and have him fight for his army. The story ends withDacre turning his sights towards finding Enva in the east. Iris Winnow works at the Oath Gazette newspaper in the city of Oath. 2. Iris Winnow is competing with Roman Kitt for a columnist position at the Oath Gazette. 3. Iris Winnow's brother, Forest, is involved in a war between the gods Enva and Dacre. 4. Iris Winnow decides to become a war correspondent after not hearing from her brother, Forest, for months. 5. Iris Winnow and Roman Kitt develop feelings for each other through letters they exchange via enchanted typewriters. 6. Iris Winnow and Roman Kitt do not initially realize they are writing letters to each other. 7. Roman Kitt was engaged to Elinor Little through an arranged marriage by his father. 8. Roman Kitt breaks off his engagement to Elinor Little and follows Iris Winnow to the war front. 9. Iris Winnow stays with Marisol at a bed and breakfast in the town of Avalon Bluff near the front lines. 10. Iris Winnow befriends fellow correspondent Attie in Avalon Bluff. 11. Roman Kitt arrives at Avalon Bluff and he and Iris Winnow fall in love. 12. Roman Kitt and Iris Winnow get married just before an attack on Avalon Bluff by Dacre's forces. 13. During the attack on Avalon Bluff, Iris Winnow is saved by a soldier who she later realizes is her brother, Forest. 14. Forest was supposed to have died from his wounds but was healed by Dacre. 15. Forest deserted from his original side and has been fighting for Dacre. 16. Iris Winnow is separated from Roman Kitt, who is badly wounded during the attack on Avalon Bluff. 17. Iris Winnow and Forest return to Oath after the attack. 18. Iris Winnow learns the full story of Forest's service to Dacre once they return to Oath. 19. Iris Winnow finds a letter from Roman Kitt in her room, which confirms he knew her identity while writing to her. 20. Dacre finds the dying Roman Kitt on the battlefield and decides to take him to heal his wounds. 21. Dacre plans for the healed Roman Kitt to fight for his army. 22. The story ends with Dacre planning to find Enva in the east.",
+            "figure_data": "CLAUDE-3-OPUSSummary1.Extracted Claims"
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "table",
+            "figure_id": "tab_12",
+            "figure_caption": "Example of a summary produced by CLAUDE-3-OPUS along with the extracted set of claims for \"Divine Rivals,\" a novel by Rebecca Ross. Examples by the other models can be found in Table9, Table10, Table11 and Table 12.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "20",
+            "figure_type": "table",
+            "figure_id": "tab_14",
+            "figure_caption": "Examples of positive and negative comments submitted by the annotators for specific models",
+            "figure_data": "IssueDefinitionExampleCHRONOLOGYIssues with the chronological ordering of(...) though it has some chronology problemsclaims.(Ari's proposal comes after the run in the city,which comes after Josh and Radhya open thepop-up) (...)OMISSIONSThe annotator mentions any omissions ofOmissions: Dr. Rob Valentine groomed Sum-content that should have been includedmer from when she was a teenager until shein the summary.turned 18 and then started an intimate rela-tionship. He later leaves Summer and mar-ries her sister. Even after he is married, hedoesn't let Summer move on."
+        },
+        {
+            "figure_label": "21",
+            "figure_type": "table",
+            "figure_id": "tab_15",
+            "figure_caption": "Categories used for the analysis of annotators' comments on the quality of the entire summary.I apologize for the confusion, but the provided summaries do not appear to be related to the same story. Summary 1 describes a novel about a young woman named Alex and her experiences in the Hamptons, while Summary 2 simply states that the provided excerpt is a table of contents or metadata without any actual story content. As there is no coherent narrative between the two summaries, it is not possible to merge them into a single, comprehensive summary. In order to create a merged summary, I would need access to summaries that are all related to the same story, with each summary focusing on different parts or aspects of that story. If you are able to provide a series of summaries that are all connected to the same narrative, I would be happy to assist in combining them into a single, cohesive summary that includes key events, backgrounds, settings, characters, objectives, and motivations, while also introducing major elements and organizing the summary in a chronological manner. Please let me know if you have any other summaries related to the story mentioned in Summary 1, as that would allow me to proceed with the merging process you have requested.",
+            "figure_data": "Model CommentSummaryNone of the claims is completely factuallycorrect, or focused on the book as they oughtto be. The first two claims are the only onesCLAUDE-3-OPUSwhere the protagonist Alex is mentioned, but both claims are still wrong. The other claims are incomprehensible, have absolutely noth-ing to do with the book, and are therefore inadmissible. In fact, the claims appear to be focused on a different topic entirely, not the book. Please note that the quotes I in-cluded below don't necessarily prove any ofthe claims wrong (or right, for that matter).(...)NOTE: The model declines to merge twosummaries due to significant discrepan-cies in content.This summary is largely factual and looks(...) Goldbeck's insightful writing and clever comedic timingat the overall arc of the text, though it haselevate the narrative, making it stand out and resonate with asome chronology problems (Ari's proposalbroad variety of readers. Reflecting upon shared preferencescomes after the run in the city, which comeslike tequila and various NYC spots, Goldbeck successfullyafter Josh and Radhya open the pop-up), andmanages to craft relatable characters with everyday experi-focuses disproportionately on the author'sences, despite their complex emotional journey. The author'sGPT-4conversation with another writer, Kate Robb, as opposed to the text itself. It also doesn't discuss the nonlinear storytelling.creative process in the narrative, including the decision to cut a subplot involving Ari working as a comedian on a cruise ship, adds a layer of interesting behind-the-scenes perspective.NOTE: The model includes back matterThe narrative style, which pays homage to classic 2000s ro-information. While accurate, it shouldmantic comedies, echoes elements of escapism, emphasizingnot have been included in the summary.the importance of literature during unprecedented times likethe global pandemic. (...)"
+        },
+        {
+            "figure_label": "27",
+            "figure_type": "table",
+            "figure_id": "tab_16",
+            "figure_caption": "Precision (PR) and Recall (RE) from LM evaluation using GPT-4-TURBO no context for each book.",
+            "figure_data": "TITLEPR-FaithfulRE-FaithfulPR-Unfaithful RE-UnfaithfulA Haunting on the0.8210.3290.2300.650HillAgency for Scandal0.9600.1330.0340.833Divine Rivals0.9600.1560.1400.917Fairytale of New York1.0000.1230.1741.000Flawless0.9500.2170.0120.500Fourth Wing1.0000.1690.1121.000Modern Divination1.0000.0620.0921.000Only For The Week0.8930.1860.0560.500Pet0.8710.1510.1210.881Romantic Comedy1.0000.1700.0201.000Same Time Next Year0.6670.1610.2040.700She Is a Haunting0.9170.2200.0650.667Six Scorched Roses0.7500.1790.2280.701Sorrow and Bliss0.9830.1970.0290.750The Atonement1.0000.0670.0691.000MurdersThe Guest0.6880.1820.2530.810The Marriage Act1.0000.1010.0411.000The Spy Coast0.8640.1510.1030.790The Wager1.0000.4950.0851.000The White Lady0.7500.0450.1510.938This Impossible1.0000.1470.0441.000BrightnessViciously Yours0.9500.2000.1130.833Weyward0.9470.5040.1610.750Wildfire1.0000.2290.0361.000You, Again1.0000.2140.0411.000Yellowface0.9330.1630.1190.938TITLEPR-FaithfulRE-FaithfulPR-UnfaithfulRE-UnfaithfulA Haunting on the Hill0.9670.5170.3370.950Agency for Scandal1.0000.5700.0631.000Divine Rivals0.9800.4270.1900.917Fairytale of New York1.0000.2300.1951.000Flawless1.0000.3520.0331.000Fourth Wing0.9850.6620.2440.950Modern Divination1.0000.4090.1381.000Only For The Week1.0000.5090.1191.000Pet0.9810.6760.2420.833Romantic Comedy1.0000.2040.0241.000Same Time Next Year0.8510.7800.3000.600She Is a Haunting0.9850.6410.1860.750Six Scorched Roses0.9070.5210.3340.759Sorrow and Bliss1.0000.3400.0381.000The Atonement Murders1.0000.3330.0931.000The Guest0.8680.6440.3910.589The Marriage Act1.0000.3600.0491.000The Spy Coast0.9750.3920.1680.933The Wager1.0000.8100.2201.000The White Lady1.0000.3110.2011.000This Impossible1.0000.3780.0491.000BrightnessViciously Yours0.9210.5080.1560.688Weyward1.0000.5980.1571.000Wildfire1.0000.3870.0421.000You, Again0.9670.4690.0480.667Yellowface0.9350.4610.1530.813"
+        },
+        {
+            "figure_label": "28",
+            "figure_type": "table",
+            "figure_id": "tab_17",
+            "figure_caption": "Results of average Precision (PR) and Recall (RE) estimated by human evidence and LM evaluation using GPT-4-TURBO for each book.",
+            "figure_data": "TITLEPR-FaithfulRE-FaithfulPR-UnfaithfulRE-UnfaithfulA Haunting on the Hill0.9020.7810.5200.550Agency for Scandal0.9740.7210.0670.333Divine Rivals0.9070.5410.2090.556Fairytale of New York0.8740.7120.2630.556Flawless1.0000.6630.0561.000Fourth Wing0.9530.7590.2440.600Modern Divination0.9500.6440.1420.700Only For The Week0.9670.7890.1670.417Pet0.9070.6040.1750.649Romantic Comedy1.0000.6750.0441.000Same Time Next Year0.8360.8590.3330.425She Is a Haunting0.9490.7720.1000.250Six Scorched Roses0.8160.5000.2690.616Sorrow and Bliss1.0000.5880.0771.000The Atonement Murders1.0000.6420.1151.000The Guest0.8450.7370.3950.598The Marriage Act0.9870.8330.1190.833The Spy Coast0.9530.5270.2160.738The Wager0.9580.8620.1000.167The White Lady0.8360.6280.0970.250This Impossible0.9610.6070.0220.250BrightnessViciously Yours0.9290.7250.1720.521Weyward0.9690.7740.3000.583Wildfire0.9800.6640.0430.750You, Again0.9600.6090.0150.333Yellowface0.9410.6950.2040.562"
+        },
+        {
+            "figure_label": "29",
+            "figure_type": "table",
+            "figure_id": "tab_18",
+            "figure_caption": "Results of average Precision (PR) and Recall (RE) estimated by BM25 retriever and LM evaluation using GPT-4-TURBO for each book.",
+            "figure_data": "Evaluation LM TITLEPR-FaithfulRE-FaithfulPR-UnfaithfulRE-UnfaithfulOnly For The Week0.9600.9720.3330.167Pet0.9210.9230.3330.262GPT-4-TURBOShe Is a Haunting Six Scorched Roses Sorrow and Bliss0.957 0.794 1.0000.949 0.958 0.8680.417 0.625 0.1390.333 0.288 1.000Viciously Yours0.9190.9190.3670.354Yellowface0.9520.9480.4500.438Only For The Week0.9800.9710.5710.667Pet0.9200.9100.4290.462CLAUDE-3-OPUSShe Is a Haunting Six Scorched Roses Sorrow and Bliss0.968 0.919 1.0000.968 0.958 0. 9660.571 0.800 0.4290.571 0.667 1.000Viciously Yours0.9310.9310.4170.417Yellowface0.9630.9630.7000.700"
+        },
+        {
+            "figure_label": "30",
+            "figure_type": "table",
+            "figure_id": "tab_19",
+            "figure_caption": "Average Precision (PR) and Recall (RE) for the Entire Book (EB) approach (i.e., prompting the model with a claim and entire book as evidence) broken down by the rater models (GPT-4-TURBO and CLAUDE-3-OPUS), for each book.",
+            "figure_data": "ModelFaithful Unfaithful Partial support Can't verifyGPT-3.5-TURBO11122208GPT-415211303MIXTRAL14418345GPT-4-TURBO10717251CLAUDE-3-OPUS1401170"
+        },
+        {
+            "figure_label": "31",
+            "figure_type": "table",
+            "figure_id": "tab_20",
+            "figure_caption": "Number of claims per label for each model in the sub-dataset of seven books.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [],
+    "doi": "10.18653/v1/2023.emnlp-main.453"
+}

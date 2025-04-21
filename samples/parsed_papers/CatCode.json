@@ -1,0 +1,809 @@
+{
+    "title": "CatCode: A Comprehensive Evaluation Framework for LLMs On the Mixture of Code and Text",
+    "caption": "The overall evaluation framework of CatCode.",
+    "authors": "Zhenru Lin; Yiqun Yao; Yang Yuan",
+    "pub_date": "",
+    "abstract": "Large language models (LLMs) are increasingly proficient in understanding and generating a mixture of code and text. Evaluation based on such mixture can lead to a more comprehensive understanding of the models' abilities in solving coding problems. However, current evaluation methods are either limited in task coverage or lack standardization. To address this issue, we propose to apply category theory as math abstraction for code-related evaluation. Specifically, morphisms within a code category can represent code debugging and transformation, functors between two categories represent code translation, and functors between a code category and a natural language category represent code generation and explanation. We present an automatic evaluation framework called CatCode (Category Code) that can assess the coding abilities of various ChatGPT-like LLMs in a comprehensive and standard way, and further support composite task evaluation. The code can be found at https://github.com/scorpio-nova/CatCode.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": "The success of large language models (LLMs) as programming assistants has been widely acknowledged, with their higher proficiency demonstrated in various coding tasks such as code generation (Li et al., 2022;Svyatkovskiy et al., 2020), code explanation (MacNeil et al., 2022), and code translation (Zhu et al., 2022). However, what truly sets the recent LLMs apart is their ability, akin to ChatGPT-like models, to comprehend and align with human intents by processing a mixture of natural language and code. This unique attribute significantly lowers the entry barrier for users, leading to their widespread adoption and notable achievements.\nTo assess the coding ability of LLMs, numerous efforts have been made by researchers. However, current evaluation methods are either limited in task coverage or lack standardization. Match-based automatic frameworks such as CodeBLEU (Ren et al., 2020) rely primarily on similarity scores to evaluate the quality of code. However, such frameworks often fail to capture the nuances of code functionality and meaning. Execution-based evaluation methods, for example, MBXP (Athiwaratkun et al., 2022) and MultiPL-E (Cassano et al., 2023), can evaluate the function accuracy of code, but they primarily focus on code generation and translation tasks. Task-based evaluation frameworks like CodeXGLUE (Lu et al., 2021) offer a comprehensive approach but lack standardization due to completely different datasets, task formulations, and APIs. Consequently, we still lack an evaluation framework to adapt to the context of a mixture of natural language and code, and there is a need to establish a comprehensive evaluation framework that not only supports diverse and novel task definitions but also provides a standardized approach.\nWe aim to establish a comprehensive theoretical framework that can be open-sourced and applied to essential coding tasks, providing standardized automatic evaluation metrics. It is a challenging task without theoretical guidance. Therefore, we seek a theory that can effectively express the structural aspects of code, language, and their interrelationships. In this context, we find category theory, a branch of mathematics, to be particularly suitable for describing relationships between various elements.\nBy utilizing category theory's mathematical abstractions, we can gain insights into the relationships among different programming languages (PLs) and natural languages (NLs).\nWe consider PLs and NLs as categories, and functionally equivalent programs as objects, and leverage functors and morphisms to capture the object relations within and across these categories. This gives a unified framework for describing functional equivalence, which not only works within a single PL, but also among different PLs, and even between PLs and NLs. By learning the morphisms within a programming language category, the model can grasp the similarities and differences between code snippets. Additionally, by acquiring knowledge of the functors between categories, the model can understand the relationship between different programming languages and natural languages.\nBased on the categorical perspective above, we build a standardized evaluation framework (see Figure 1). It is standardized in terms of data definition, task formulation, and APIs. This framework can be extended to many code-related tasks as long as a categorical definition is given. In our experiments, we give some examples of common code-related tasks, and assess models such as ChatGPT and CodeGeeX for their capabilities in identifying functional equivalence in code, performing code translation, generating code explanations, and reconstructing code based on explanations. We have observed that these models still struggle to differentiate between the concepts of \"functional equivalence\" and \"similarity\" in code.\nWhile they demonstrated relatively satisfactory performance in code translation, maintaining functional equivalence between code and its corresponding explanations remains a persistent challenge.\nOur main contributions can be listed as follows:",
+            "publication_ref": [
+                "b11",
+                "b17",
+                "b13",
+                "b22",
+                "b5",
+                "b12"
+            ],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Java",
+            "text": "Reproduction functor explanation functor translation functor",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "self-morphism morphism",
+            "text": "English python • We introduce CatCode, a novel evaluation perspective for code-related tasks based on category theory, which provides a comprehensive framework that encompasses a wide range of code-related task formulations. • We present a standardized automatic evaluation platform within the CatCode framework, that offers a quantitative assessment of the coding abilities of Language Models (LLMs) and can adapt to various datasets and models, which will be publicly available. • We evaluate competitive LLMs, including ChatGPT, StarCoder and CodeGeeX, providing insights into their strengths and limitations in understanding the mixture of NL and code.\nA B C A' B' C' A'' B'' C'' Java A B C Java python A B C A'' B'' C'' Java A B C Java English A B C A' B' C' Java A B C",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Methods",
+            "text": "Generally, it is difficult to achieve both comprehensiveness and standardization. In Section 2.1, we show that the categorical perspective, with its emphasis on generalization and abstraction, offers a valuable approach to achieving comprehensiveness in dealing with the mixture of code and natural language. In Section 2.2, we discuss the significance of standardization and outline strategies for achieving it.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Comprehensive Categorical Perspective",
+            "text": "Category theory studies how structures arising in different areas can be described with a common language. It was originally developed to transport ideas from one branch of mathematics to another, e.g. from topology to algebra. Category Theory has been applied to different fields, ranging from functional programming to logic, software design, and linguistics (Spivak, 2014;Ahrens & Wullaert, 2022;Fong & Spivak, 2018;Bradley, 2018). Here we provide the basic definitions used in our work and explain their applications to describe code and natural language. -\nAssociativity: If f : a → b, g : b → c, and h : c → d then h • (g • f ) = (h • g) • f .\n-Identity: For every object x, there exists a morphism id x : x → x called the identity morphism for x, such that for every morphism f : a → b, we have id b\n• f = f = f • id a .\nApplication 2.1. (Category, Object, Morphism of Code and NL). For describing the mixture of code and natural languages, we first regard them as objects from different categories. We consider the code categories that contain all executable code in a certain language:\nFigure 3: Standardized evaluation platform. The central pipeline offers a consistent approach for all evaluations. Behind the pipeline, we provide a variety of functions to automatically conduct the most important steps. With our platform released, the pipeline can easily accommodate novel datasets, tasks, and models by following the instructions outlined alongside the grey lines.\nC Java , C Python , ... We define the natural language categories which contain all description/explanation/summarization of code etc.: C English , C Chinese , ... For simplicity, let's call them C 1 , C 2 , ... In a category, there are infinitely many different objects. We name these objects o 1 , o 2 , ... Each object contains infinitely many programs, with the same running outcome for each valid input.\nWe use this definition because we focus on the functional equivalence of code function. For example, one may have slightly different implementations of quick sorts, but they represent exactly the same function.1 \nBased on the definition of objects, we define the morphism between two objects, as \"necessary edits to convert a function to another\". In particular, we define the self-morphism for each object, as \"edits that do not change the functionality of the program\". Definition 2.2. (Functor). A functor F from a category C to a category D, written as F : C → D, maps an object x ∈ Ob(C) to F(x) ∈ Ob(D); as well as a morphism f : x → y in Hom(C) to F( f ) : F(x) → F(y) in D, such that the following two properties hold:\n-For every object x in C, F(id x ) = id F(x) ;\n-For all morphisms f : x → y and g :\ny → z, F(g • f ) = F(g) • F( f ).\nApplication 2.2. (Functor of Mixture of Code and NL). We define the functor from C 1 to C 2 , to be the transform from one language to another language, but with the same functionality.\nWhen it applies to two code categories, it usually represents code translation, and we define it as a \"translation functor\". When the functor is between a code category and a natural language category, it may have many possible meanings, for instance, we can define \"generation functor\" from NL to PL that generate code solution to a problem description, \"explanation functor\" from PL to NL that explains a piece of code, and \"reproduction functor\" from NL to PL that generates code snippets based on code descriptions.",
+            "publication_ref": [
+                "b16",
+                "b1",
+                "b7",
+                "b4"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Standardized Evaluation Platform",
+            "text": "To show the practical use of categorical framework and support the community, we opensource our evaluation framwork2 . Figure 3. shows the streamlined process of our standardized evaluation platform. Standardization within the framework is achieved through a focus on three critical aspects: data definition, task formulation, and APIs.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Data definition",
+            "text": "The original datasets may consist of a mixture of code and natural languages, so a clear data definition is crucial. The code can be in different languages (Java, Python, JavaScript, etc.), and on different levels (single-line, function-level, file-level). Natural language can be in different relationships with the code (problem descriptions, code comments, demands, etc.). By establishing a standardized data definition, we ensure compatibility and facilitate the comparison and integration of different datasets and tasks. For implementation, we use a \"data formatter\" to rearrange code based on the definition of objects and categories. Additionally, we provide \"predefined morphisms\" and implement them based on JavaTransformer (Rabin et al., 2019) to automatically apply morphisms to code objects, which makes it easy for data augmentation.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Task formulation",
+            "text": "We use a categorical perspective to formulate diverse code-related tasks using the unified language of objects, morphisms, and functors. A good task formulation allows for a more generalized and flexible approach to defining more complex code problems, enabling the inclusion of a wide variety of code-related tasks and comparing their similarities and differences. Based on the task formulation, we carefully decide what parts of the code and NL should be the model input, ensuring a cleaner setting. Then we use \"prompt selector\" to select a suitable prompt for task description, and use \"input constructor\" to combine the data and prompt as task input.\nAPIs After the data is ready, we focus on the standardization of model APIs and test APIs. Standardized APIs promote transparency, fairness, and efficiency in the evaluation. By defining a clear and consistent set of APIs, we have integrated OpenAI models into the evaluation process and can test them using parallel requests. For postprocessing the model's output, we enable the extraction and filtering of plain text from the code-text mixture. For test APIs, we provide a \"pairing test\" API for evaluating the model's answer based on natural language, and an \"execution test\" API, which connects to Mxeval (Athiwaratkun et al., 2022) for compiling and running the tests for a given code.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Use category framework for evaluation",
+            "text": "In this section, we exhibit some experimental examples of how to use our platform. Meanwhile, we explore the following three types of tasks: discriminant task, generation task, and composite task, that correspond to those illustrated in Step 3 of Figure 1. (Related tasks: code explanation, code summarization, code generation, code reproduction)\n→ Categorical perspective: Can the model preserve the functional equivalence after applying an explanation functor and then a reproduction functor?\nWe conduct three experiments from categorical aspects accordingly. For a common setting, we use three multilingual datasets: HumanEval-X (Zheng et al., 2023), MBXP (Athiwaratkun et al., 2022), and MathQA (Amini et al., 2019;Athiwaratkun et al., 2022) throughout the three experiments, and use five models: Text-Davinci-003, gpt3.5-turbo, Llama-2-7b-chat- \n1-neq morphism ! 𝑎 ! 𝑏 ̅ 𝑐 ≁ 𝑎 ! 𝑎 ! \" 𝑎 ! # 𝑎 $ 1-e q m o rp h is m 𝑑 = 2 𝑑 = 1 𝑑 = 1 ∃ global morphism 𝑑 ≫ 1 𝒞",
+            "publication_ref": [
+                "b21",
+                "b2"
+            ],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiment 1: Morphism Identification Within a Code Category",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Categorical Perspective Settings",
+            "text": "Object Distance To test the model on both local and global scales, we define the \"distance\" between two codes. As illustrated in Figure 4. In a PL Category C, we use ∼ to express functional equivalence. ā = {x | x ∈ C, x ∼ a} means the set of all code that has the same functionality as a. In this category, ā and c are two different objects. Within ā, all code instances are functionally equivalent, e.g. a i and a j . We can apply predefined morphisms to the objects. For example, we can apply 1-step equivalent morphisms(1-eq morphism) on a i to get new program instances still in ā, or apply 1-step nonequivalent morphism(1neq morphism) to get new instance in another equivalent class b. Distance d represents the minimal number of morphisms needed to transform one program to another given a predefined morphism set. For example, Applying two different self-morphism on a i returns a 1 i and a 2 i , then we need at least two steps to transform from a 1 i to a 2 i . Those are local-scale equivalence. If it is hard to transform a i to a j within just a few steps(e.g., 1 or 2 steps as illustrated here), we treat them as global-scale equivalence.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_4"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Implementation",
+            "text": "Dataset For local morphism, we extract the Java functions within HumanEval-X, MBXP, and MathQA datasets. We perform the 9 local morphisms based on AST transformations.\n1. Variable Renaming (VR): rename a variable, with a new name randomly chosen from all variable names in the dataset, or use \"var N \" for simplicity 2. Boolean Exchange (BE): propagate the exchange of \"true\" and \"false\" throughout the method and preserve the same logic 3. Loop Exchange (LE): exchange f or loops and while loops 4. Switch To If (SI): replace a switch statement with an equivalent if statement 5. Unused Statement(US): insert an unused string declaration to a randomly selected basic block in a method 6. Reorder Condition (RC): write the condition in reverse order (e.g., change i < n to n > i) 7. Permute Statement(PS): swap two independent statements (i.e. without data or control dependence) 8. Modify Condition(MC): change the binary operation in the condition (e.g., change i < n to i ≤ n) 9. Remove Else(RE): delete the else branch of the if-else statement The first 7 morphisms are adopted from JavaTransform (Rabin et al., 2019) that conducts functionally equivalent transformations, which means they are self-morphisms. Other than self-morphisms, we add 2 morphisms: ModifyCondition and RemoveElse, that change the program's function.\nFor global morphisms, since the three datasets above do not contain multiple solutions to the same problem using the same PL, we complement with code from the test split of Code Contest (Li et al., 2022) dataset.\nFor dataset statistics and the detailed preprocess procedure, please refer to Table 2 in the Appendix.",
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Models",
+            "text": "We evaluate Text-Davinci and ChatGPT. We input (code, code) pairs from the datasets or generated by morphisms, and ask the model to answer whether they are functionally equivalent.\nEvaluation We collect the model's yes/no responses and calculate the average precision for different morphisms.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results",
+            "text": "The results are demonstrated in Figure 4. Overall, Text-Davinci and ChatGPT make a tie. Locally, ChatGPT is better at identifying nonequivalent morphisms, and worse at equivalent ones. Globally, Text-Davinci is better at identifying global nonequivalent morphisms. Note that a random guess leads to a precision of 50%, so both models behave just slightly better than random guesses for identifying global equivalence.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_4"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiment 2: Translation Functor Between Different PL Categories",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Categorical Perspective Settings",
+            "text": "We investigate the model's ability to perform code translation by utilizing functors between two programming language categories. To isolate the influence of natural language, we exclude problem descriptions and code comments, forcing the models to focus solely on translating code from one programming language (PL) category to another. The input prompt may contain a request for translation using natural language (e.g., \"translate the below Java code to Python code\").",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Implementation",
+            "text": "Datasets We conduct evaluations on the HumanEval-X, MathQA, and MBXP datasets. The input category is Java, while the output categories are JavaScript and Python.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Models",
+            "text": "We evaluate five models: Text-Davinci, ChatGPT, CodeGeeX, Llama2 and StarCoder. For CodeGeeX, code translation is supported inherently, so we simply input the Java code without additional text. For the other models, we provide prompts that request the model to do the translation.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluation",
+            "text": "We extract the functions from the model's responses and assess their correctness using the Pass@1 rates of execution-based tests.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results",
+            "text": "The results are depicted in Figure 5. Among the three models, ChatGPT performs the best, exhibiting a slight advantage over Text-Davinci. With regards to the datasets, ChatGPT and ",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_5"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiment 3: Explanation Functor and Reproduction Functor Between PL and NL Categories",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Categorical Perspective Settings",
+            "text": "Code explanation and code generation tasks have been conducted separately in previous work. However, from a categorical perspective, we can make a combination. We define the explanation functor as the functor that maps an object from a PL category to an NL category, with a precise description of the code's function. We define the reproduction functor as the functor from an NL category to a PL category, that uses an explanation object in NL to reproduce the code of the same function in a PL category. If the reproduced code is functionally the same as the original code, we reckon the model preserves the functional equivalence after applying an explanation functor and then a generation functor.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Implementation",
+            "text": "Datasets We conduct the evalution on three datasets: HumanEval-X, MathQA, and MBXP.\nFor consistency, we select Java as the programming language (PL) category for all evaluations.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Models",
+            "text": "We evaluate Text-Davinci, ChatGPT, Llama2 and StarCoder, prompting each model twice. In the first prompt, we ask the models to describe the code using natural language, including the precise function name, arguments, and return type, and provide sufficient information to reproduce the code. In the second prompt, we provide the model's explanation and ask it to translate the description back into code.\nEvaluation To evaluate the correctness of the reproduced code, we extract the functions from the model's second responses and assess them using the Pass@1 rates of execution-based tests.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results",
+            "text": "The results are depicted in Figure 6. On the same datasets and with the same two models, the average pass@1 rate is about 30% lower compared to that of the translation functor. This indicates the model has significant information loss in the explain-reproduce process. ",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_6"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Additional Notes on the composite task",
+            "text": "As models evolve, scores on high-quality datasets tend to saturate (HumanEval 90%). Should we abandon HumanEval, and call for massive efforts to construct new ones? We believe it's not the only way. With CatCode, we can easily define composite tasks, and make the evaluation effective again. The construction of composite tasks is mostly automatic, greatly reducing the labor for collecting new datasets.\nMoreover, real-world applications often require model to handle those composite tasks. For example, developers may need to use the model to write new features, and synchronize code updates between Android and iOS versions. To this end, we propose and experiment on a new task \"repair morphism + translation functor\" using the CodeScope dataset. We use the code repair subset from the CodeScope dataset (Yan et al., 2023) and add a step for the model to translate from C++ to C after debugging C programs. Results on GPT-4 show that pass@1 drops from 26/60 in the original task to 18/60 in the composite task, which shows that the composite task is more difficult.",
+            "publication_ref": [
+                "b20"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Summary",
+            "text": "Based on our experiments, we have found that both Text-Davinci and ChatGPT models are capable of identifying the impact of one or two local morphisms on code function. However, identifying global morphisms proves to be challenging for these models. In terms of code translation, both ChatGPT and Text-Davinci models outperform other models. They demonstrate accurate reproduction of basic syntax, variable names, and numerical values. Nevertheless, when dealing with more intricate program structures and aligning data types across different programming language categories, these models encounter obstacles that hinder more precise translation.\nIt is important to note that maintaining functional equivalence between code and natural language presents a more formidable challenge compared to code translation.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Coding Abilities of Large Language Models",
+            "text": "Research on large language models trained on code has made significant strides. CodeBERT (Feng et al., 2020) and GraphCodeBERT (Guo et al., 2020) incorporated program Abstract Syntax Trees (AST) and data flow information to enhance code structure and context understanding. The Encoder-Decoder architecture in CodeT5 (Wang et al., 2021) and PLBART (Ahmad et al., 2021) supports multi-task learning, aiding code translation and generation. More recently, the emergence of Codex (Chen et al., 2021), ChatGPT, and StarCoder (Li et al., 2023) has brought GPT-based models into the mainstream for content generation tasks, including coding. These models have shown impressive performance across various domains, but their proprietary nature, limited access to data, or lack of model checkpoints have made it challenging to thoroughly evaluate and understand their capabilities and limitations. Consequently, there is a need to develop a comprehensive framework to evaluate these black-box models.",
+            "publication_ref": [
+                "b8",
+                "b19",
+                "b6"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Code Model Evaluation",
+            "text": "Evaluation of code models is diverse, encompassing match-based, task-based, and executionbased frameworks. The match-based approach, exemplified by CodeBLEU (Ren et al., 2020), considers n-gram matches and AST similarity but may overlook functional equivalence in varying solutions. Task-based evaluations, like CodeXGLUE (Lu et al., 2021), offer comprehensive assessments across coding tasks but lack uniformity in data and task settings, limiting scalability. Execution-based evaluation, used in benchmarks like MBXP (Athiwaratkun et al., 2022) and MultiPL-E (Cassano et al., 2023), judges code correctness through test cases.\nOur work mainly focuses on providing a new framework for unifying the task-based evaluation. While our work also considers test cases from execution-based benchmarks, our focus extends beyond correctness evaluation to include code morphism, PL to NL functor aspects, and the composition of different tasks, for example the code reproduction task can be viewed as the combination of code explanation and generation tasks.\nMoreover, code-related models are found to be sensitive to slight edits in the prompts, therefore to evaluate their robustness is crucial. Previous work applies semantics-preserving transformations on code docstrings and program, for better training and evaluation of models (Wang et al., 2022;Henkel et al., 2022). Apart from using transformations based on AST edits to ensure accuracy, we further investigate the models' robustness by providing a finer-grained characterization based on the edit distance of correct and incorrect edits.",
+            "publication_ref": [
+                "b12",
+                "b5",
+                "b18",
+                "b9"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": "Our contributions include introducing CatCode as a novel evaluation perspective based on category theory, which enables a comprehensive and mathematically abstract approach to evaluate LLMs that excel in understanding and generating a mixture of code and text.\nBased on categorical perspectives, we present a standardized automatic evaluation platform, which is adaptive to new datasets, tasks, and models. We evaluate competitive LLMs to provide valuable insights and find out current models' deficiency in recognizing functionally equivalent code and preserving information of code function between the code and its explanation. We open-source our platform, hoping to contribute to the comprehensive and standardized evaluation for LLMs by offering a categorical perspective to deal with the mixture of code and text. We hope that CatCode inspires further research and development in the field, leading to LLMs that can effectively assist developers in more complex coding tasks and contribute to advancements in artificial intelligence and software engineering as a whole.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Discussion",
+            "text": "While we strive to apply categorical perspectives to offer a comprehensive and standardized way of evaluation, we find some limitations and room for future work. First, we use prompts to instruct the models to act as certain functors, but prompts that express similar meanings will lead to different results, we have not investigated which prompts are more suitable for the model or which models are more robust to different prompts.\nIn this paper, our experiments primarily focus on objects, morphisms, functors, and their combinations. For future work, more powerful concepts and properties in category theory can be used for more complex and composite coding tasks. For example, we can further investigate the setting of composing many morphisms and many functors, to further explore the commutative law and isomorphism properties of categories.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Model Morphism Translation Functor Explanation Functor Reproduction Functor",
+            "text": "Davinci ✓ ✓ ✓ ✓ ChatGPT ✓ ✓ ✓ ✓ CodeGeeX ✓ LLaMa2-7b ✓ ✓ ✓ ✓ StarCoder ✓ ✓ ✓ ✓\nTable 1: Baseline Models and their supported evaluation tasks.\n• Only the Java split of HumanEval-X, MBXP, and MathQA datasets are used. The local morphism is applied by JavaTransformer by AST edits at the function level. To use JavaTransformer, code must compile successfully and contain a single function. We filter out code in the Mxeval datasets that are generated by the model and cannot compile or contain multiple functions.\n• Due to the large size of the Code Contest dataset, only the test set is used. Considering that the maximum token length of Text-Davinci is 2048, we filter out solutions with a length greater than 500. This ensures that the code pair length remains ≤ 1000, allowing for additional tokens for prompt content and response. After filtering, 97 problems remain, and a problem may have multiple correct and incorrect solutions in different languages. We utilize the Java and Python splits of this dataset.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.2 Model details",
+            "text": "We utilize the following baseline models by making API calls to their official endpoints: Text-Davinci-003 (referred to as Davinci), ChatGPT, CodeGeeX. The default hyperparameters of these models are used, with the exception of setting max token to 500 when an early stop of the answer is observed.\nTable 1 provides an overview of the tasks supported by each model. Since Text-Davinci-003 and ChatGPT support various types of text inputs and outputs, they are capable of performing all tasks. On the other hand, the CodeGeeX API does not support natural language output, so we only employ it in translation functor experiments.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.3 Evaluation Metrics",
+            "text": "To assess the performance of the model, we conduct two types of tests: pairing test and execution-based test.\nThe pairing test is utilized for morphism identification. The task involves comparing two code snippets and requesting the model to explicitly answer \"True\" or \"False\", along with providing a comparison. For automatic evaluation, we extract the True\" or \"False\" answer.\nThe precision score is used to evaluate the model's ability to identify different equivalence classes. For equivalent objects, the precision is calculated as Precision(eq) = TP TP+FN , while for nonequivalent objects, the precision is calculated as Precision(neq) = TN TN+FP . The execution-based test is employed for both translation and reproduction experiments. We extract the functions from the model's responses and evaluate their correctness using the Pass@1 rates of execution-based tests. This test ensures that the translated/reproduced code produces the same expected results as the original code.  3: Morphism types with the three worst average precision scores of each dataset. As an example for notations, BE-VR (66.67) stands for a 2-eq morphism of \"Boolean Exchange\" and \"Variable Renaming\" with a precision score of 66.67%. solely of Java code. The constructed pairs are generated through sampling. It is worth noting that certain morphisms can have multiple outputs for a given input. For instance, the Variable Renaming morphism can be applied to all variables in a function, resulting in multiple outputs equal to the number of variables. To balance the number of outputs across different morphism types, random sampling is employed when there are more than two applicable morphism types. For each code sample, two types of morphisms are first sampled, followed by sampling one output for each morphism type.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B Experimental Details",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Discussion of different morphism types.",
+            "text": "Which morphism types are harder to be identified, and are they hard across datasets? We calculate the average precision scores for 1-eq, 2-eq and 1-neq local morphisms for ChatGPT answers, as shown in Table 3.\nThe following observations can be made:\n• For one morphism: \"Unused Statements\", \"Modify Condition\" and \"Boolean Exchange\" are particularly difficult to identify. One possible reason for this difficulty is that these morphisms involve subtle changes or transformations in the code that may not be easily recognizable based on the surrounding context alone. It requires a more nuanced understanding of the code logic and structure to detect these morphisms\n• For 2-eq morphisms: The observation that \"Unused Statements\" remains challenging when combined with other morphisms suggests that the presence of multiple morphisms in the code can further complicate the identification task.\n• Dataset-specific difficulties: The results indicate that the difficulty of identifying \"Unused Statements\" persists across datasets, suggesting that this morphism type poses inherent challenges in code comprehension. On the other hand, the specific difficulty in identifying \"Modify Condition\" in the MathQA dataset may be attributed to the nature of the dataset itself, which focuses on math problem solvers.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.2 Translation Functor",
+            "text": "Data statistics. We use the filtered data in Table 2 as input, i.e. 159, 953, and 97 Java Snippets for HumanEval-X, MBXP, and MathQA, respectively. Each model generates a Python object and a JavaScript object for each Java object. During test phase, since the Mexeval dataset is missing 3 test cases in the Java split of HumanEval (TaskID: 32, 38, 50), we use 156, 953, and 97 Java functions to calculate the pass@1 rates for HumanEval-X, MBXP, and MathQA respectively.\nResults statistics. The pass@1 score of different models on different datasets is shown in fails to pass some of the test cases. Additionally, both models also encounter errors related to symbol identification, such as \"CannotFindSymbol\" and \"TypeError\". These errors are primarily compilation errors.\nIt's worth further investigating the causes behind these failure types and exploring strategies to improve the models' performance, especially in handling test cases and resolving symbolrelated errors.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "C Case Study",
+            "text": "In this Section, we analyze some classical cases from our three experiments.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C.1 Morphism Identification",
+            "text": "Refer to Figure 7 and Figure 8. Those cases show the model can identify the literate differences between the code pairs but fails to clearly interpret their functional difference.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C.2 Translation Functor",
+            "text": "According to the previous statistics, most translation errors happen in the compilation stage.\nWe are also concerned about if there are no compile errors, when will the model make mistakes. Figure 9 shows such a case where some information about the numerical data type is missing when translation.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C.3 Explanation Functor and Reproduction Functor",
+            "text": "Figure 10 shows a case where information loss and hallucination happen during explanation and reproduction. This is often the case when the model deals with the MathQA dataset. To improve the performance of the model, using few-shot prompts to illustrate how to explain the code may be useful.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Code translation Docstring translation",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Code detection Defect detection",
+            "text": "Code repair",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Code explanation Code summarization Original Tasks",
+            "text": "Code Objects We conduct the experiments within the PL category and define \"the function with the same running outcome for every valid input\" as the same object.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Code Morphism",
+            "text": "The general category perspectives only define morphisms between two code snippets, but morphisms do not have distance information. Considering fine-grained evaluation, we are curious about the model's ability to modify or debug the code, which corresponds to the local scale; and to write an equivalent new solution to a coding problem, which is of a global scale.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Appendix",
+            "text": "The appendix is divided into three main sections, each focusing on distinct aspects of the study. These sections are labeled as follows:\nA. Implementation Details: This section covers the implementation process, including the GitHub link to our code, dataset details, data filtering, model specifications, and evaluation metrics, providing information on how to reproduce based on our standard evaluation pipeline.\nB. Experimental Details: This part introduces the experimental settings and more experimental results in detail. We further discuss the model's performance on different morphism types in the identification experiment, and the common error types in the translation and reproduction experiments.\nC. Case Study: This section offers some intuitive examples of the experiments. Through analysis of those examples, we can find some limitations of current models, prompts, and test scripts.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Implementation Details",
+            "text": "We have uploaded the code to GitHub: https://github.com/scorpio-nova/CatCode. A README.md file is provided, offering step-by-step instructions on how to use the evaluation platform and replicate the entire evaluation process in a standardized way.\nIn this section, we will provide additional details regarding the reproduction process, including the dataset split, data filtering, models used, and evaluation metrics.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.1 Dataset Details",
+            "text": "The following datasets were used in our evaluation:\n• HumanEval-X 3 : a human-crafted dataset with 164 problems, correct solutions in 5 different languages, and test cases. It is a benchmark for evaluating code generation and translation models. We use the Java split of HumanEval-X as input for applying morphism, code translation, and code explanation. Although Mxeval provide multilingual solutions, they are generated by models and do not make a distinction between correct and wrong solutions. In contrast, HumanEval-X provides correct solutions, making it a more suitable complement.\n• MBXP: a benchmark for evaluating code generation models. It covers over 10 programming languages and is generated using a scalable conversion framework that transpiles prompts and test cases from the original Python datasets into the corresponding data in the target language. It's a dataset similar to HumanEval-X but does not ensure the correctness of the transpiled code.\n• MathQA: a dataset for evaluating math problem solvers. All functions in this dataset have no input argument and return a number. The functions first initialize variables, then do some calculations, and do not use any loops or conditional statements. Compared to HumanEval-X and MBXP, the code in MathQA is simpler in structure and functionality.\n• Code Contest: a large-scale competitive multi-language programming dataset used for training AlphaCode (Li et al., 2022). It consists of programming problems, test cases in the form of paired inputs and outputs, and both correct and incorrect solutions. Since the aforementioned datasets do not provide multiple solutions within the same programming language, Code Contest serves as a valuable complement by offering multiple solutions to the same problem, representing global equivalence and non-equivalence.\nJava->Py Java->JS Java->Py Java->JS Java->Py Java Discussion of failure types. Table 5 represents the most frequent failure types of translation functor on three datasets. We observe that most errors are compilation errors rather than failures at corner test cases.\nThese errors are often caused by type mismatches between different programming languages. For instance, when translating a list in Java, there are multiple potential types in Python, including list, tuple, and List from the typing module.\nThe occurrence of \"NameError\" and \"ReferenceError\" indicates an unfaithful translation of variable names by the model or mismatched function input arguments across different languages for the same problem. This is a limitation inherent in the current evaluation setup.\nOverall, the models have demonstrated the ability to perform correct translations in most cases between different programming languages. The errors mainly arise from type alignment issues between programming languages and local variable definitions. These errors are typically easy to debug for programmers if provided with relevant information. Future work could involve passing error messages to the model and allowing it to debug itself.",
+            "publication_ref": [
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.3 Explanation and Reproduction Functor",
+            "text": "Data statistics. Same as Appendix B.2, we use 156, 953, and 97 Java functions to calculate the pass@1 rates for HumanEval-X, MBXP, and MathQA separately.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results statistics.",
+            "text": "Table 6 shows the pass@1 rates of different models. TextDavinci is better at MathQA, while ChatGPT is better at HumanEval and MBXP datasets. The pass@1 score is significantly lower compared to translation functor experiments, indicating that it's a more difficult task.\nDiscussion of failure types. Table 7 shows the most frequent failure types of translation functor on the three datasets. Based on the results, it appears that both models encounter similar types of failures across the different evaluation tasks. The \"Test Failure\" type is particularly prominent, indicating that the reproduced code, although compiling successfully, Prompt Text: Do the two codes below have the same output for each input? In your first sentence, answer \"True\" or \"False\". Then points out all the differences of the two codes.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "HumanEval/154",
+            "text": "LoopExchange-ReorderCondition ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ChatGPT Response",
+            "text": "False. Differences:\n-In code A, the while loop is used to iterate through the `l+1`possible subpatterns of `a`that have length `l`. In code B, the for loop is used instead.\n-In code B, the condition for the for loop is `j <= l`, which means it checks if `j`is less than or equal to `l`. This will result in the last possible subpattern being ignored because `j`will stop at `l`and not check anything after it. Therefore, the correct condition should be `j < l`.\n-In code B, the condition for comparing the substrings is `if (a.substring(i, l + i).equals(pat.substring(j, j + l)))`. This checks if the substring of `a`starting from index `i`with a length of `l`equals the corresponding substring of `pat`. In code A, the condition is similar, except it uses `a.substring(i, i + l)`instead. Both conditions are correct, but they differ slightly in their expression.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "HumanEval/129 LoopExchange-ReorderCondition",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ChatGPT Response",
+            "text": "False. The codes have differences in their inner loops and conditions inside the loops.\nCode A uses a while loop to iterate through the columns of each row, whereas Code B uses two for loops to iterate through both rows and columns of the grid. Code A also checks whether a cell contains a 1 before checking its neighbors, while Code B simply iterates through every cell regardless of its value. Finally, there is an error in Code B where it checks the neighbor to the bottom incorrectly: it should use `i + 1`instead of `1 + i`.\nFigure 7: Two failed cases of ChatGPT in the morphism identification experiment. For \"HumanEval/154\", ChatGPT fails to interpret the loop execution condition correctly. For \"HumanEval/129\" ChatGPT reckon equivalent math expression as different. To improve the model's reasoning ability, a possible way is to utilize the method of Chain of Thoughts(CoT) to construct better prompts and give the model some time to think before making a decision.\nPrompt Text: Do the two codes below have the same output for each input? In your first sentence, answer \"True\" or \"False\". Then points out all the differences of the two codes.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "HumanEval/94",
+            "text": "BooleanExchange-VariableRenaming\nfor (int j = 2; j < Math.sqrt(i)\nfor (int j = 2; j < Math.sqrt(i)",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ChatGPT Response",
+            "text": "False.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Differences:",
+            "text": "-In code A, the `isPrime`boolean variable is assigned to `!(i != 1)`which is equivalent to `i == 1`. Whereas in code B, it is assigned to `i != 1`.\n-In code A, the condition for updating the `maxx`variable is `if (!(isPrime))`which means if the number is not prime.\nWhereas in code B, it is `if (isPrime)`which means if the number is prime.\n-...\n-Inside the inner loop of the `isPrime`check, code A sets `isPrime`to `true`if a factor of `i`is found and breaks out of the loop. This is incorrect since it sets `isPrime`to true even when a factor is found, whereas it should set it to false because `ih as factors other than 1 and itself. Code B correctly sets `isPrime`to `false`in this case.\n-...  ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Explanation (by Text-Davinci)",
+            "text": "This is a public static method called 'problem()' that does not take any arguments and returns a double value. The method initializes the variables n0 to n10 with double values and assigns them to the specified numbers. It then uses the Math.pow() method to use the variables n9 and n10 as the base for the power and the Math.min() method to use the variables n3 or n0 as the second parameter. It then assigns these two values, t0 and t1, as addends of a sum and returns the answer, a double value.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Execution Results",
+            "text": "Exception --test case 0 did not pass. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Unified pre-training for program understanding and generation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Ahmad Wasi Uddin; Saikat Chakraborty; Baishakhi Ray; Kai-Wei Chang; Luke Zettlemoyer; Dilek Hakkani-T Ür; Iz Beltagy; Steven Bethard"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Category theory for programming",
+            "journal": "",
+            "year": "1259",
+            "authors": "Benedikt Ahrens; Kobe Wullaert"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Towards interpretable math word problem solving with operationbased formalisms",
+            "journal": "",
+            "year": "2019",
+            "authors": "Aida Amini; Saadia Gabriel; Peter Lin; Rik Koncel-Kedziorski; Yejin Choi; Hannaneh Hajishirzi;  Mathqa"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Multi-lingual evaluation of code generation models",
+            "journal": "",
+            "year": "",
+            "authors": "Ben Athiwaratkun; Krishna Sanjay; Zijian Gouda; Xiaopeng Wang; Yuchen Li; Ming Tian;  Tan; Uddin Wasi; Shiqi Ahmad; Qing Wang; Mingyue Sun; Sujan Shang; Hantian Kumar Gonugondla; Varun Ding; Nathan Kumar; Arash Fulton; Siddhartha Farahani; Robert Jain; Haifeng Giaquinto;  Qian; Krishna Murali; Ramesh Ramanathan; Baishakhi Nallapati; Parminder Ray; Sudipta Bhatia; Dan Sengupta; Bing Roth;  Xiang"
+        },
+        {
+            "ref_id": "b4",
+            "title": "What is applied category theory?",
+            "journal": "",
+            "year": "2018",
+            "authors": "Tai-Danae Bradley"
+        },
+        {
+            "ref_id": "b5",
+            "title": "MultiPL-E: A Scalable and Polyglot Approach to Benchmarking Neural Code Generation",
+            "journal": "IEEE Transactions on Software Engineering",
+            "year": "2023",
+            "authors": "Federico Cassano; John Gouwar; Daniel Nguyen; Sydney Nguyen; Luna Phipps-Costin; Donald Pinckney; Ming-Ho Yee; Yangtian Zi; Carolyn Jane Anderson; Molly Q Feldman; Arjun Guha; Michael Greenberg; Abhinav Jangda"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Evaluating large language models trained on code",
+            "journal": "",
+            "year": "2020",
+            "authors": "Mark Chen; Jerry Tworek; Heewoo Jun; Qiming Yuan; Henrique Ponde De Oliveira Pinto; Jared Kaplan; Harrison Edwards; Yuri Burda; Nicholas Joseph; Greg Brockman; Alex Ray; Raul Puri; Gretchen Krueger; Michael Petrov; Heidy Khlaaf; Girish Sastry; Pamela Mishkin; Brooke Chan; Scott Gray; Nick Ryder; Mikhail Pavlov; Alethea Power; Lukasz Kaiser; Mohammad Bavarian; Clemens Winter; Philippe Tillet; Felipe Petroski Such; Dave Cummings; Matthias Plappert; Fotios Chantzis; Elizabeth Barnes; Ariel Herbert-Voss; William Hebgen Guss; Alex Nichol; Alex Paino; Nikolas Tezak; Jie Tang; Igor Babuschkin; Suchir Balaji; Shantanu Jain; William Saunders; Christopher Hesse; Andrew N Carr; Jan Leike; Joshua Achiam; Vedant Misra; Evan Morikawa; Alec Radford; Matthew Knight; Miles Brundage; Mira Murati; Katie Mayer; Peter Welinder; Bob Mcgrew; Dario Amodei; Sam Mccandlish; Ilya Sutskever; Wojciech Zaremba"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Seven sketches in compositionality: An invitation to applied category theory",
+            "journal": "",
+            "year": "2018",
+            "authors": "Brendan Fong; David I Spivak"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Pre-training code representations with data flow",
+            "journal": "",
+            "year": "2020",
+            "authors": "Shuo Daya Guo; Shuai Ren; Zhangyin Lu; Duyu Feng; Shujie Tang; Long Liu; Nan Zhou; Alexey Duan; Shengyu Svyatkovskiy;  Fu"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Semantic robustness of models of source code",
+            "journal": "IEEE",
+            "year": "2022",
+            "authors": "Jordan Henkel; Goutham Ramakrishnan; Zi Wang; Aws Albarghouthi; Somesh Jha; Thomas Reps"
+        },
+        {
+            "ref_id": "b10",
+            "title": "",
+            "journal": "Sean Hughes, Thomas Wolf, Arjun Guha",
+            "year": "",
+            "authors": "Raymond Li; Loubna Ben Allal; Yangtian Zi; Niklas Muennighoff; Denis Kocetkov; Chenghao Mou; Marc Marone; Christopher Akiki; Jia Li; Jenny Chim; Qian Liu; Evgenii Zheltonozhskii; Terry Yue Zhuo; Thomas Wang; Olivier Dehaene; Mishig Davaadorj; Joel Lamy-Poirier; João Monteiro; Oleh Shliazhko; Nicolas Gontier; Nicholas Meade; Armel Zebaze; Ming-Ho Yee; Logesh Kumar Umapathi; Jian Zhu; Benjamin Lipkin; Muhtasham Oblokulov; Zhiruo Wang; Rudra Murthy; Jason Stillerman; Sankalp Siva; Dmitry Patel; Marco Abulkhanov; Manan Zocca; Zhihan Dey; Nour Zhang; Urvashi Fahmy; Wenhao Bhattacharyya; Swayam Yu; Sasha Singh; Paulo Luccioni; Maxim Villegas; Fedor Kunakov; Manuel Zhdanov; Tony Romero; Nadav Lee; Jennifer Timor; Claire Ding; Hailey Schlesinger; Jan Schoelkopf; Tri Ebert; Mayank Dao; Alex Mishra; Jennifer Gu; Carolyn Jane Robinson; Brendan Anderson; Danish Dolan-Gavitt; Siva Contractor; Daniel Reddy; Dzmitry Fried; Yacine Bahdanau;  Jernite"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Competition-level code generation with alphacode",
+            "journal": "Science",
+            "year": "2022",
+            "authors": "Yujia Li; David Choi; Junyoung Chung; Nate Kushman; Julian Schrittwieser; Rémi Leblond; Tom Eccles; James Keeling; Felix Gimeno; Agustin Dal Lago; Thomas Hubert; Peter Choy; Cyprien De Masson D'autume; Igor Babuschkin; Xinyun Chen; Po-Sen Huang; Johannes Welbl; Sven Gowal; Alexey Cherepanov; James Molloy; Daniel J Mankowitz; Esme Sutherland Robson; Pushmeet Kohli; Koray Nando De Freitas; Oriol Kavukcuoglu;  Vinyals"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Codexglue: A machine learning benchmark dataset for code understanding and generation",
+            "journal": "",
+            "year": "2021",
+            "authors": "Shuai Lu; Daya Guo; Shuo Ren; Junjie Huang; Alexey Svyatkovskiy; Ambrosio Blanco; Colin Clement; Dawn Drain; Daxin Jiang; Duyu Tang"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Generating diverse code explanations using the GPT-3 large language model",
+            "journal": "ACM",
+            "year": "2022",
+            "authors": "Stephen Macneil; Andrew Tran; Dan Mogil; Seth Bernstein; Erin Ross; Ziheng Huang"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Testing neural programs",
+            "journal": "",
+            "year": "2019",
+            "authors": ""
+        },
+        {
+            "ref_id": "b15",
+            "title": "Codebleu: a method for automatic evaluation of code synthesis",
+            "journal": "",
+            "year": "2020",
+            "authors": "Daya Shuo Ren; Shuai Guo; Long Lu; Shujie Zhou; Duyu Liu; Neel Tang; Ming Sundaresan; Ambrosio Zhou; Shuai Blanco;  Ma"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Category Theory for the Sciences",
+            "journal": "MIT Press",
+            "year": "2014",
+            "authors": "David I Spivak"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Intellicode compose: code generation using transformer",
+            "journal": "ACM",
+            "year": "2020",
+            "authors": "Alexey Svyatkovskiy; Shengyu Shao Kun Deng; Neel Fu;  Sundaresan"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Robustness evaluation of code generation models",
+            "journal": "",
+            "year": "2022",
+            "authors": "Shiqi Wang; Zheng Li; Haifeng Qian; Chenghao Yang; Zijian Wang; Mingyue Shang; Varun Kumar; Samson Tan; Baishakhi Ray; Parminder Bhatia"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Codet5: Identifier-aware unified pre-trained encoder-decoder models for code understanding and generation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021-11-11",
+            "authors": "Yue Wang; Weishi Wang; R Shafiq; Steven C H Joty;  Hoi"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Codescope: An executionbased multilingual multitask multidimensional benchmark for evaluating llms on code understanding and generation",
+            "journal": "",
+            "year": "2023",
+            "authors": "Weixiang Yan; Haitian Liu; Yunkun Wang; Yunzhe Li; Qian Chen; Wen Wang; Tingyu Lin; Weishan Zhao; Li Zhu; Shuiguang Deng; Hari Sundaram"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Codegeex: A pre-trained model for code generation with multilingual evaluations on humaneval-x",
+            "journal": "",
+            "year": "2023",
+            "authors": "Qinkai Zheng; Xiao Xia; Xu Zou; Yuxiao Dong; Shan Wang; Yufei Xue; Zihan Wang; Lei Shen; Andi Wang; Yang Li; Teng Su; Zhilin Yang; Jie Tang"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Multilingual code snippets training for program translation",
+            "journal": "",
+            "year": "2022",
+            "authors": "Ming Zhu; Karthik Suresh; Chandan K Reddy"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: The overall evaluation framework. We use category perspectives to reorganize and transform data, formulate different coding tasks, and conduct model evaluations.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2 :2Figure 2: Categorical framework for a mixture of code and NL. A, B and C represent different objects, A and A ′′ represent the equivalent object of A in other categories.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 2 illustrates those concepts in a comprehensive way. Definition 2.1. (Category, Object, Morphism). A category C consists of a set of objects Ob(C) and a set of morphisms Hom C (a, b), from a to b for every a, b ∈ Ob(C). Given two morphisms f ∈ Hom C (a, b), g ∈ Hom C (b, c), we define their composition as g • f ∈ Hom C (a, c). The composition of morphisms is governed by two axioms:",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Discriminant task: Can the model exactly capture code meanings and identify similar/different code? (Related tasks: code detection, defect detection, code repair) → Categorical perspective: Can the model identify the self-morphisms and other morphisms within the same code category? Generation task: Can the model translate code between programming languages? (Related tasks: code translation) → Categorical perspective: Can the model accurately perform code translation functor? Composite task: Can the model reproduce the code after equivalent transformations?",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 4 :4Figure 4: Morphism Identification Experiment. \"1\", \"2\" and \"global\" stands for the distance of the code.\"Eq\" and \"neq\" indicates whether the morphism is self-morphism. (Left) An illustration of morphisms and the definition of object distance. (Right) Comparison of Text-Davinci and ChatGPT for morphism identification. hf, starchat-beta (Text-Davinci, ChatGPT, Llama2 and StarCoder for short accordingly) as common baseline models. For more detailed experimental settings and interesting results about specific model performance, please refer to Appendix A and B.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 5 :5Figure 5: Comparison of performance for the model as translation functor between different PL categories. (Left) Translate from Java to JavaScript (Right) Translate from Java to Python.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 6 :6Figure 6: Comparison of model performance for the model as the combination of explanation functor and reproduction functor between PL and NL categories.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "",
+            "figure_caption": "",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Table2provides the statistics of the raw data, filtered data, and constructed pairs for the morphism identification experiment. The filtering strategy, described in Section A.1, involves removing comments and docstrings, resulting in filtered data consisting",
+            "figure_data": "Dataset#after filter / #raw data #equivalent pair #nonequivalent pairHumaneval-X159 / 164477173MBXP953 / 97428491010MathQA1734 / 188148521418Code Contest97 / 16497366"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Dataset statistics for morphism identification experiment.",
+            "figure_data": "HumanEvalMathQAMBXPBE-VR (66.67) MC (45.66)BE (33.33)US (74.74)RC-US (85.71) PS-US (69.57)LE-RC (78.57) PS-US (87.84) RC-US (70.39)Table"
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Overall, ChatGPT has a relatively higher translation ability.",
+            "figure_data": "ModelHumanEval MathQA MBXP Avg.TextDavinci33.075.555.254.6ChatGPT35.969.157.154.0Llama-2-7b-chat-hf25.959.445.443.5Starchat-beta21.845.440.736.0"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "Pass@1 score (%) statistics of the reproduced code, corresponding to the Figure6(Right).",
+            "figure_data": "ModelHumanEvalMathQAMBXPCannotFindSymbol (47)Test Failure (350)Test Failure (181)TextDavinciTypeError (38)UninitializedVariable (24)CannotFindSymbol (164)Test Failure (22)CannotFindSymbol (18)TypeError (27)CannotFindSymbol (46)Test Failure (401)CannotFindSymbol (137)ChatGPTTypeError (39)DuplicateDeclaration (60) Test Failure (126)Test Failure (17)SyntaxError (44)UnexpectedEOF (70)"
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Most frequent failure types of the reproduced code. The data in the table cell is written as ErrorType(frequency). Specifically, the \"Test Failure\" type represents the code that complies successfully but fails to pass some of the test cases. Other types of errors in this table are primarily caused by compilation errors.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "A B C A' B' C' A'' B'' C'' Java A B C Java python A B C A'' B'' C'' Java A B C Java English A B C A' B' C' Java A B C",
+            "formula_coordinates": [
+                3.0,
+                163.23,
+                88.78,
+                440.73,
+                347.05
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "Associativity: If f : a → b, g : b → c, and h : c → d then h • (g • f ) = (h • g) • f .",
+            "formula_coordinates": [
+                3.0,
+                112.48,
+                652.3,
+                342.14,
+                9.9
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "• f = f = f • id a .",
+            "formula_coordinates": [
+                3.0,
+                414.68,
+                680.19,
+                76.89,
+                10.56
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "y → z, F(g • f ) = F(g) • F( f ).",
+            "formula_coordinates": [
+                4.0,
+                272.27,
+                494.26,
+                131.34,
+                9.69
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "1-neq morphism ! 𝑎 ! 𝑏 ̅ 𝑐 ≁ 𝑎 ! 𝑎 ! \" 𝑎 ! # 𝑎 $ 1-e q m o rp h is m 𝑑 = 2 𝑑 = 1 𝑑 = 1 ∃ global morphism 𝑑 ≫ 1 𝒞",
+            "formula_coordinates": [
+                6.0,
+                130.01,
+                82.69,
+                143.72,
+                95.66
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "Davinci ✓ ✓ ✓ ✓ ChatGPT ✓ ✓ ✓ ✓ CodeGeeX ✓ LLaMa2-7b ✓ ✓ ✓ ✓ StarCoder ✓ ✓ ✓ ✓",
+            "formula_coordinates": [
+                15.0,
+                113.98,
+                94.51,
+                374.14,
+                53.42
+            ]
+        }
+    ],
+    "doi": "10.18653/v1/2021.naacl-main.211"
+}

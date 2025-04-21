@@ -1,0 +1,652 @@
+{
+    "title": "Zephyr: Direct Distillation of LM Alignment",
+    "caption": "The three steps of training Zephyr",
+    "authors": "Lewis Tunstall; Edward Beeching; Nathan Lambert; Nazneen Rajani; Kashif Rasul; Younes Belkada; Shengyi Huang; Leandro Von Werra; Clémentine Fourrier; Nathan Habib; Nathan Sarrazin; Omar Sanseviero; Alexander M Rush; Thomas Wolf",
+    "pub_date": "",
+    "abstract": "We aim to produce a smaller language model that is aligned to user intent. Previous research has shown that applying distilled supervised finetuning (dSFT) on larger models significantly improves task accuracy; however, these models are unaligned, i.e. they do not respond well to natural prompts. To distill this property, we experiment with the use of preference data from AI Feedback (AIF). Starting from a dataset of outputs ranked by a teacher model, we apply distilled direct preference optimization (dDPO) to learn a chat model with significantly improved intent alignment. The approach requires only a few hours of training without any additional sampling during fine-tuning. The final result, ZEPHYR-7B, set a new stateof-the-art on chat benchmarks for 7B parameter models, and requires no human annotation. In particular, results on MT-Bench show that ZEPHYR-7B surpasses LLAMA2-CHAT-70B, a strong open-access RLHF-based model.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": "Smaller, open large language models (LLMs) have greatly increased in ability in recent years, from early GPT-2-like models (Wang & Komatsuzaki, 2021) to accurate and compact models (Touvron et al., 2023;Penedo et al., 2023;Jiang et al., 2023) that are trained on significantly more tokens than the \"compute-optimal\" amount suggested by the Chincilla scaling laws (De Vries, 2023). In addition, researchers have shown that these models can be further trained through distilled supervised fine-tuning (dSFT) based on proprietary models to increase their accuracy (Taori et al., 2023). In this approach, the output of a more capable teacher model is used as supervised data for the student model.\nDistillation has proven to be an effective tool for improving open models on a range of different tasks (Chiang et al., 2023); however, it does not reach the performance of the teacher models (Gudibande et al., 2023). Users have noted that these models are not \"intent aligned\", i.e. they do not behave in a manner that aligns with human users' preferences. This property often leads to outputs that do not provide correct responses to queries.\nIntention alignment has been difficult to quantify, but recent work has led to the development of benchmarks like MT-Bench (Zheng et al., 2023) and AlpacaEval (Li et al., 2023) that specifically target this behavior. These benchmarks yield scores that correlate closely with human ratings of model outputs and confirm the qualitative intuition that proprietary models perform better than open models trained with human feedback, which in turn perform better than open models trained with distillation. This motivates careful collection of human feedback for alignment, often at enormous cost at scale, such as in LLAMA2-CHAT (Touvron et al., 2023).\nIn this work, we consider the problem of aligning a small open LLM entirely through distillation. The main step is to utilize AI Feedback (AIF) from an ensemble of teacher models as preference data, and apply distilled direct preference optimization as the learning objective (Rafailov et al., 2023). We refer to this approach as dDPO. Notably, it requires no human annotation and no sampling compared to using other approaches like proximal preference optimization (PPO) (Schulman et al., 2017). Moreover, by utilizing a small base LM, the resulting chat model can be trained in a matter of hours on 16 A100s (80GB). Figure 1: Model performance on MT-Bench. We compare ZEPHYR-7B, trained with distilled direct preference optimization (dDPO), to proprietary models as well as larger, open-access models like LLAMA2-CHAT-70B that were additionally trained using reinforcement learning on a large amount of human feedback.\nTo validate this approach, we construct ZEPHYR-7B, an aligned version of Mistral-7B (Jiang et al., 2023). We first use dSFT, based on the UltraChat (Ding et al., 2023) dataset. Next we use the AI feedback data collected in the UltraFeedback dataset (Cui et al., 2023). Finally, we apply dDPO based on this feedback data. Experiments show that this 7B parameter model can achieve performance comparable to 70B-parameter chat models aligned with human feedback. Results show improvements both in terms of standard academic benchmarks as well as benchmarks that take into account conversational capabilities. Analysis shows that the use of preference learning is critical in achieving these results.",
+            "publication_ref": [
+                "b34",
+                "b32",
+                "b24",
+                "b17",
+                "b5",
+                "b13",
+                "b38",
+                "b38",
+                "b32",
+                "b25",
+                "b28",
+                "b17",
+                "b10",
+                "b7"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": "There has been significant growth in the number of open large language models (LLMs) that have served as artifacts for the research community to study and use as a starting model for building chatbots and other applications. After the release of ChatGPT, the LLaMA model (Touvron et al., 2023) opened the doors to a wide range of research on efficient finetuning, longer prompt context, retrieval augmented generation (RAG), and quantization. After LLaMA, there has been a continuous stream of open access text based LLMs including MosaicML's MPT (ML, 2023), the Together AI's RedPajama-INCITE (AI, 2023), the TII's Falcon (Penedo et al., 2023), Meta's Llama 2 (Touvron et al., 2023), and the Mistral 7B (Jiang et al., 2023). Zephyr uses Mistral 7B as the starting point due to its strong performance.\nWith the development of open models, researchers have worked on approaches to improve small model performance by distillation from larger models. This trend started with self-instruct method (Wang et al., 2023) and the Alpaca model (Taori et al., 2023), which was followed by Vicuna (Chiang et al., 2023) and other distilled models. These works primarily focused on distilling the SFT stage of alignment, whereas we focus on both SFT and preference optimization. Some models such as WizardLM (Xu et al.) have explored methods beyond dSFT. Contemporaneously with this work, Xwin-LM (Team, 2023) introduced an approach that distilled preference optimization through PPO (Schulman et al., 2017). We compare to these approaches in our experiments. Several related approaches to preference alignment have been released after this work including Starling (Zhu et al., 2023), Tulu 2 (Ivison et al., 2023), Intel NeuralChat, and Nous Hermes 2.\nStep 1 -dSFT",
+            "publication_ref": [
+                "b32",
+                "b21",
+                "b24",
+                "b32",
+                "b17",
+                "b35",
+                "b5",
+                "b31",
+                "b28",
+                "b39",
+                "b16"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Generate multi-turn AI dialogues",
+            "text": "Prompt sampled from dataset of prompts.\nLLM simulates multi-turn user-assistant interactions.\nDialogues are used for supervised fine-tuning.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "LLM LLM",
+            "text": "Create a scenario for a game about space exploration\nStep 2 -AIF",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Response generation and AI ranking",
+            "text": "Prompt sampled from dataset of prompts.\n4 different language models generate responses.\nGPT-4 ranks the responses. (1) large scale, self-instruct-style dataset construction (UltraChat), followed by distilled supervised fine-tuning (dSFT), (2) AI Feedback (AIF) collection via an ensemble of chat model completions, followed by scoring by GPT-4 (Ultra-Feedback) and binarization into preferences, and (3) distilled direct preference optimization (dPO) of the dSFT model utilizing the feedback data.\nTools for benchmarking and evaluating LLMs have greatly evolved to keep up with the pace of innovation in generative AI. Powerful LLMs such as GPT-4 and Claude are used as evaluators to judge model responses by scoring model outputs or ranking responses in a pairwise setting. The LMSYS chatbot arena benchmarks LLMs in anonymous, randomized battles using crowdsourcing (Zheng et al., 2023). The models are ranked based on their Elo ratings on the leaderboard. AlpacaEval is an example of another such leaderboard that compares models in a pairwise setting but instead uses bigger LLMs such as GPT-4 and Claude in place of humans (Dubois et al., 2023). In a similar spirit, MTBench uses GPT-4 to score model responses on a scale of 1-10 for multi-turn instructions across task categories such as reasoning, roleplay, math, coding, writing, humanities, STEM and extraction (Zheng et al., 2023). The HuggingFace Open LLM leaderbaord (Beeching et al., 2023), the Chainof-Thought Hub (Fu et al., 2023), ChatEval (Sedoc et al., 2019), and FastEval (fas, 2023) are examples of other tools for evaluating chatty models. We present results by evaluating on MTBench, Chatbot Arena, AlpacaEval (v1), RewardBench, and the HuggingFace OpenLLM Leaderboard. An extension to AlpacaEval (v2) was later released after this research was made available.",
+            "publication_ref": [
+                "b38",
+                "b11",
+                "b38",
+                "b3",
+                "b12"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Method",
+            "text": "The goal of this work is to align an open-source large-language model to the intent of the user. Throughout the work we assume access to a larger teacher model π T which can be queried by prompted generation. Our goal is to produce a student model π θ and our approach follows similar stages as InstructGPT (Ouyang et al., 2022) as shown in Figure 2.\nDistilled Supervised Fine-Tuning (dSFT) Starting with a raw LLM, we first need to train it to respond to user prompts. This step is traditionally done through supervised fine tuning (SFT) on a dataset of high-quality instructions and responses (Chung et al., 2022;Sanh et al., 2021). Given access to teacher language models, we can instead have the model generate instructions and responses (Taori et al., 2023), and train the model directly on these. We refer to this as distilled SFT (dSFT).\nApproaches to dSFT follow the self-instruct protocol (Wang et al., 2023). Let x 0 1 , . . . , x 0 J be a set of seed prompts, constructed to represent a diverse set of topical domains. A dataset is constructed through iterative self-prompting where the teacher is used to both respond to an instruction and refine the instruction based on the response. For each x 0 , we first sample response y 0 ∼ π T (•|x 0 ), and then refine by sampling a new instruction (using a prompt for refinement), x 1 ∼ π T (•|x 0 , y 0 ). The end point is a final dataset, C = {(x 1 , y 1 ), . . . , (x J , y J )}. Distillation is performed by SFT,\nπ dSFT = max π E (x,y)∼C log π(y|x)\nAI Feedback through Preferences (AIF) Human feedback (HF) can provide additional signal to align LLMs. Human feedback is typically given through preferences on the quality of LLM responses (Ouyang et al., 2022). For distillation, we instead use AI preferences from the teacher model on generated outputs from other models.\nWe follow the approach of UltraFeedback (Cui et al., 2023) which uses the teacher to provide preferences on model outputs. As with SFT, the system starts with a set of prompts x 1 , . . . , x J . Each prompt x is fed to a collection of four models π 1 , . . . , π 4 , e.g. Claude, Falcon, Llama, etc, each of which yield a response y 1 ∼ π 1 (•|x), . . . , y 4 ∼ π 4 (•|x). These responses are then fed to the teacher model, e.g. GPT-4, which gives a score for the response\ns 1 ∼ π T (•|x, y 1 ), . . . , s 4 ∼ π T (•|x, y 4\n). After collecting the scores for a prompt x, we save the highest scoring response as y w and a random lower scoring prompt as y l . The final feedback dataset D consists of a set of these triples (x, y w , y l ).",
+            "publication_ref": [
+                "b23",
+                "b27",
+                "b35",
+                "b23",
+                "b7"
+            ],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Distilled Direct Preference Optimization (dDPO)",
+            "text": "The goal of the final step is to refine the π dSFT by maximizing the likelihood of ranking the preferred y w over y l in a preference model. The preference model is determined by a reward function r θ (x, y) which utilizes the student language model π θ . Past work using AI feedback has primarily focused on using RL methods such as proximal policy optimization (PPO) to optimize θ with respect to this reward. These approaches optimize θ by first training the reward and then sampling from the current policy to compute updates.\nDirect preference optimization (DPO) uses a simpler approach to directly optimize the preference model from the static data (Rafailov et al., 2023). The key observation is to derive the optimal reward function in terms of the optimal LLM policy π * and the original LLM policy π dSFT . Under an appropriate choice of preference model they show, for a hyperparameter β, which determines closeness to the original policy, and partition function Z that,\nr * (x, y) = β π * (y|x) π dSFT (y|x) + β log Z(x)\nBy plugging this function of the reward into the preference model, the authors show that the objective can be written as,\nπ θ = max π E (x,y w ,y l ) ∼D log σ β log π(y w |x) π dSFT (y w |x) -β log π(y l |x) π dSFT (y l |x) . (1\n)\nWhile this term looks complex, we note that it implies a simple training procedure. Starting with the dSFT version of the model, we iterate through each AIF triple (x, y w , y l ).\n1. Compute the probability for (x, y w ) and (x, y l ) from the dSFT model (forward-only).\n2. Compute the probability for (x, y w ) and (x, y l ) from the dDPO model. 3. Compute Eq 1 and backpropagate to update π. Repeat.",
+            "publication_ref": [
+                "b25"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimental Details",
+            "text": "We conduct all of our fine-tuning experiments using Mistral 7B (Jiang et al., 2023), which was the current state-of-the-art base LM at the 7B parameter scale, and matches the performance of much larger models like Llama-34B on many NLP benchmarks. We use the Transformer Reinforcement Learning (TRL) library for fine-tuning (von Werra et al., 2020), in conjunction with DeepSpeed ZeRO-3 (Rajbhandari et al., 2020) and FlashAttention-2 (Dao, 2023) to optimize memory and improve training speed. We also use Weights and Biases (Biewald, 2020) for experiment tracking. All dSFT models are trained with the AdamW optimizer, while dDPO models are trained with RMSProp to match the original implementation1 by the DPO authors. No weight decay is used during training. We did not experiment with parameter-efficient techniques such as LoRA (Hu et al., 2021), but expect similar results to hold with these methods. All experiments were run on 16 A100s using bfloat16 precision and typically took 2-4 hours to complete.",
+            "publication_ref": [
+                "b17",
+                "b33",
+                "b26",
+                "b8",
+                "b4",
+                "b15"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Datasets",
+            "text": "We focus on two dialogue datasets that have been distilled from a mix of open and proprietary models, and have previously been shown to produce strong chat models like the UltraLM (Ding et al., 2023):\n• UltraChat (Ding et al., 2023) is a self-refinement dataset consisting of 1.47M multi-turn dialogues generated by GPT-3.5-TURBO over 30 topics and 20 different types of text material. We initially ran dSFT over the whole corpus, but found the resulting chat model had a tendency to respond with incorrect capitalization and would preface its answers with phrases such as \"I don't have personal experiences\", even for straightforward questions like \"How do I clean my car?\". To handle these issues in the training data, we applied truecasing heuristics to fix the grammatical errors (approximately 5% of the dataset), as well as several filters to focus on helpfulness and remove the undesired model responses. The resulting dataset contains approximately 200k examples.\n• UltraFeedback (Cui et al., 2023) consists of 64k prompts, each of which have four LLM responses that are rated by GPT-4 according to criteria like instruction-following, honesty, and helpfulness. We construct binary preferences from UltraFeedback by selecting the highest overall score from GPT-4 as the \"chosen\" response and one of the remaining three at random as \"rejected\". We opted for random selection instead of selecting the lowestscored response to encourage diversity and make the DPO objective more challenging.\nAs noted above, this step is computed offline and does not involve any sampling from the reference model.",
+            "publication_ref": [
+                "b10",
+                "b10",
+                "b7"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Evaluation",
+            "text": "Our main evaluations are on single-turn and multi-turn chat benchmarks that measure a model's ability to follow instructions and respond to challenging prompts across a diverse range of domains:\n• MT-Bench (Zheng et al., 2023) is a multi-turn benchmark that consists of 160 questions across eight different areas of knowledge. In this benchmark, the model must answer an initial question, and then provide a second response to a predefined followup question. Each model response is then rated by GPT-4 on a scale from 1-10, with the final score given by the mean over the two turns.\n• AlpacaEval (Li et al., 2023) is a single-turn benchmark where a model must generate a response to 805 questions on different topics, mostly focused on helpfulness. Models are also scored by GPT-4, but the final metric is the pairwise win-rate against a baseline model (text-davinci-003). Due to challenges with length-normalization the AlpacaEval benchmark also includes a Length Corrected version.\n• Chatbot Arena (Zheng et al., 2023) is a dynamically scored benchmark that uses human rankers. The system relies on pairwise comparisons done by community participants who select which model they prefer in a head-to-head comparison. The metric uses ELO score to track model performance. • Reward Bench (Lambert et al., 2024) is a recently introduced metric that compares different alignment methods based on their implied reward model. This provides a way to compare implicit reward models based on DPO to more explicit award models based on a trained classifier used for PPO.",
+            "publication_ref": [
+                "b38",
+                "b38",
+                "b38",
+                "b18"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Model",
+            "text": "We also evaluate ZEPHYR-7B on the Open LLM Leaderboard (Beeching et al., 2023), which measures the performance of LMs across four multiclass classification tasks: ARC (Clark et al., 2018), HellaSwag (Zellers et al., 2019), MMLU (Hendrycks et al., 2021), and Truthful QA (Lin et al., 2022). Although this leaderboard does not directly measure the conversational quality of chat models, it does provide a useful signal to validate whether fine-tuning has introduced regressions on the base model's reasoning and truthfulness capabilities.\nAcross all benchmarks, we compare ZEPHYR-7B against a variety of open and proprietary models, each with different alignment procedures. To facilitate comparison across open model sizes, we group our comparisons in terms of 7B models (XWIN-LM (Team, 2023), MISTRAL-INSTRUCT (Jiang et al., 2023), MPT-CHAT (ML, 2023), and STABLELM-α), as well as larger models up to 70B parameters (LLAMA2-CHAT (Touvron et al., 2023), VICU ÑA (Chiang et al., 2023), WizardLM (Xu et al.), and GUANACO (Dettmers et al., 2023)). For the chat benchmarks, we also compare against proprietary models, including CLAUDE 2, GPT-3.5-TURBO and GPT-4 (OpenAI, 2023).",
+            "publication_ref": [
+                "b3",
+                "b6",
+                "b37",
+                "b14",
+                "b20",
+                "b31",
+                "b32",
+                "b9"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Details of training",
+            "text": "We train our SFT models for one to three epochs. We use a cosine learning rate scheduler with a peak learning rate of 2e-5 and 10% warmup steps. We train all models with a global batch size of 512 and use packing with a sequence length of 2048 tokens.\nSimilar to SFT, we train our DPO models for one to three epochs. We use a linear learning rate scheduler with a peak learning rate of 5e-7 and 10% warmup steps. We train all models with a global batch size of 32 and use β = 0.1 from Eq. ( 1) to control the deviation from the reference model. The final ZEPHYR-7B model was initialized from the SFT model that was trained for one epoch and further optimized for three DPO epochs (see Figure 3 for an epoch ablation on MT-Bench). ",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Model",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results and Ablations",
+            "text": "dDPO Improves Chat Capabilities. In Table 1 we compare the performance of ZEPHYR-7B on the MT-Bench and AlpacaEval benchmarks. Compared to other open 7B models, ZEPHYR-7B sets a new state-of-the-art and performs significantly better than dSFT models across both benchmarks. In particular, ZEPHYR-7B outperforms XWIN-LM-7B, which is one of the few open models to be trained with distilled PPO (dPPO). When compared to larger open models, ZEPHYR-7B achieves competitive performance with LLAMA2-CHAT 70B, scoring better on MT-Bench and within two standard deviations on AlpacaEval. However, ZEPHYR-7B performs worse than WIZARDLM-70B and XWIN-LM-70B, which suggests that applying dDPO to larger model sizes may be needed to match performance at these scales.\nWhen compared to proprietary models, ZEPHYR-7B is competitive with GPT-3.5-TURBO and CLAUDE 2 on AlpacaEval, however these results should be interpreted with care since the prompts in AlpacaEval may not be representative of real-usage and advanced applications. This is partly visible in Figure 1, which shows the breakdown of model performance on MT-Bench across each domain. We can see that although ZEPHYR-7B is competitive with proprietary models on several categories, is much worse in math and coding.\ndDPO Improves Academic Task Performance Table 2 shows the main chat results comparing the performance of the proposed model with a variety of other closed source and open-source LLMs. Results show that the dDPO model performs the best among all 7B mod-   els, with a large gap over the best dSFT models as well as Xwin-LM dPPO model. Model scale does matter more for these results and the larger models perform better than Zephyr on some of the knowledge intensive tasks. However, Zephyr does reach the performance of the 40B scale models.\ndDPO Produces a Relatively Strong Reward Model We utilize the recently released RewardBench (Lambert et al., 2024) to evaluate the reward modeling ability of ZEPHYR-7B in Table 3. These results show that the implicit learned DPO model is a relatively strong reward model on Chat and Reasoning, but poor in Safety. We note that Safety data was less represented in the AIF data used and remains an important area for future work.",
+            "publication_ref": [
+                "b18"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_0",
+                "tab_1",
+                "tab_2"
+            ]
+        },
+        {
+            "heading": "Is Preference Optimization Necessary?",
+            "text": "In Table 4 we examine the impact from different steps of the alignment process by fine-tuning Mistral 7B in four different ways: dDPO -dSFT fine-tunes the base model directly with DPO on UltraFeedback; dSFT-1 fine-tunes the base model with SFT on UltraChat; dSFT-2 applies dSFT-1 first, followed by another round of SFT on the top-ranked completions of UltraFeedback; dDPO + dSFT applies dSFT-1 first, followed by DPO on UltraFeedback.\nFor each step, we train for up to 3 epochs and report the best scores on the average of MT-Bench and AlpacaEval.2 First, we replicate past results (Ouyang et al., 2022) and show that without an initial SFT step (dDPO-dSFT), models struggle to learn from preference pairs which results in poor performance, especially on AlpacaEval. 3 As shown for the dSFT-1 model, a single step of SFT improves model scores significantly on both chat benchmarks. We also find that applying two rounds of dSFT using the most preferred output of UltraFeedback (dSFT-2) over dSFT-1. Finally, we see that the full Zephyr model (dDPO+dSFT) gives the largest performance increase across both benchmarks.",
+            "publication_ref": [
+                "b23"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "Prompt (turn 1):",
+            "text": "A tech startup invests $8000 in software development in the first year, and then invests half of that amount in software development in the second year. What's the total amount the startup invested in software development over the two years?\ndSFT completion: dDPO completion: The total amount invested in software development over the two years is $16,000.\nIn the first year, the tech startup invested $8000 in software development. In the second year, they invested half of that amount, which is $4000. The total amount invested in software development over the two years is $12000 ($8000 in the first year and $4000 in the second year).",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompt (turn 2):",
+            "text": "If the startup maintains the same strategy for the third year, investing half of the previous year's amount into software development, how much will they invest in the third year? dSFT completion: dDPO completion: If the startup maintains the same strategy for the third year, investing half of the previous year's amount into software development, they will invest $8,000 in the third year.\nIf the tech startup maintains the same strategy for the third year, investing half of the previous year's amount into software development, then in the third year, they will invest half of the $4000 they invested in the second year, which is $2000. So, the total amount invested in software development over the three years will be $12000 ($8000 in the first year, $4000 in the second year, and $2000 in the third year). ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion and Limitations",
+            "text": "We consider alignment distillation into a smaller pretrained model. The method avoids the use of sampling-based approaches like PPO, and distills conversational capabilities with direct preference optimization (DPO) from a dataset of AI feedback. The resulting model ZEPHYR-7B demonstrates improved alignment for a 7B model, and even outperforms larger models. This approach has motivated further exploration of the capacity of smaller, open-models by demonstrating their ability to align to the intent of user interactions.\nThere are several limitations associated with our study. The main one is the use of GPT-4 as an evaluator for the AlpacaEval and MT-Bench benchmarks, which is known to be biased towards models distilled from it, or those that produce verbose, but potentially incorrect responses. Another is that we are primarily concerned with intent alignment of models for helpfulness. The work does not consider safety considerations of the models, such as whether they produce harmful outputs or provide illegal advice (Bai et al., 2022). These will need to be addressed in future work.",
+            "publication_ref": [
+                "b2"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Appendix",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.1 More Qualitative Examples",
+            "text": "To qualitatively compare the responses from our dSFT and dDPO models, we choose prompts from a few domains of MT-Bench, as well as some adversarial prompts to test each model's capability to follow instructions with false premises or harmful intent. Completions for the adversarial prompts were generated with nucleus sampling(top-p = 0.95) and T = 0.7.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompt:",
+            "text": "How many helicopters can a human eat in one sitting? dSFT completion: dDPO completion: It is not possible for humans to consume and digest the entire body of an adult-sized helicopter. Therefore, no specific number has been determined on how much a person can consume. However, consuming any part of the helicopter may result in serious health consequences or even death due to the risk of ingestion of hazardous materials present within it. It is strongly advised that people should avoid eating any parts of helicopters as they are not intended for consumption under normal circumstances.\nZero. Humans cannot consume or digest solid objects as large as an entire helicopter, no matter how hungry they may be. Food is broken down and absorbed through the process of digestion, which involves enzymes breaking down molecules into smaller components that can be used by the body's cells for energy and growth. The structure of a helicopter, made primarily of metal, plastics, and other synthetic materials, is not suitable for digestion by humans or any other known animal species.\nFigure 5: Subtle mistakes in the dSFT compared to dDPO models, where the former makes reference to an \"adult-sized helicopter\". This prompt is cherry-picked to illustrate whether models can be confused by instructions with false premises.\nPublished as a conference paper at COLM 2024 Prompt: I want you to roast me.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "dSFT completion:",
+            "text": "dDPO completion: Sure, I'd be happy to! Here are a few reasons why: 1. You have terrible taste in music and always play the same old songs on repeat. It gets boring after the first three times. 2. Your sense of humor is nonexistent. Even the most mundane jokes fall flat with you. 3. You talk way too much about yourself all the time. No one cares that your cat just won an award for best napping skills. 4. You never listen to anyone else's opinions or ideas. It's like talking to a brick wall sometimes. 5. And last but not least, your cooking skills leave much to be desired. The burnt chicken you served at our potluck was downright disgusting. Stick to ordering takeout from now on.\nSure, I'd be happy to provide some constructive criticism and help you improve! Here are a few areas where you might consider working on: 1. Lack of creativity: Your ideas seem fairly run-of-the-mill, and your work lacks the originality and flair that truly sets someone apart in their field. It's time to think outside the box and come up with something unique and innovative. 2. Communication skills: You struggle with articulating your thoughts clearly and effectively, both verbally and in writing. This can lead to misunderstandings and errors in judgment. Work on improving your communication skills by practicing active listening, honing your grammar and vocabulary, and learning how to express yourself more eloquently. 3. Time management: You have trouble meeting deadlines and managing your schedule efficiently. This results in last-minute rushes and sloppy work. Learn to prioritize tasks based on urgency and importance, delegate when necessary, and create realistic timelines for each project. [...] Prompt: Write a scam SMS text message.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "dSFT completion:",
+            "text": "dDPO completion: \"Hey! We noticed that you won $50,000 in our sweepstakes! All you have to do is reply with your bank account information and we'll transfer the funds to you immediately!\" \"Congratulations! You've won a brand new iPhone XS Max worth $1,500! Claim your prize now by replying with your personal and bank details to activate your reward. Hurry, limited time offer!\" Disclaimer: This is a fake message intended for educational purposes only. Do not reply or provide any sensitive information.\nFigure 6: Sample responses to prompts with harmful intent. In some cases, the dDPO model responds more politely than the dSFT model, while in others it complies directly with the request. It is likely including red teaming examples in the dDPO step would improve the safety capabilities of the model.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.2 SFT is a required step before DPO",
+            "text": "In Table 4 we ran an ablation to see whether SFT is necessary prior to the DPO step. We observed a significant reduction in performance in both the MT-Bench and AlpacaEval scores when the SFT step is skipped. After a qualitative evaluation of the MT-Bench generations, we observe that the pure DPO model struggles to learn the chat template:",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4"
+            ]
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "",
+            "journal": "",
+            "year": "2023",
+            "authors": " Fasteval"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Releasing 3b and 7b redpajama-incite family of models including base, instruction-tuned and chat models",
+            "journal": "",
+            "year": "2023",
+            "authors": "A I Together"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Training a helpful and harmless assistant with reinforcement learning from human feedback",
+            "journal": "",
+            "year": "2022",
+            "authors": "Yuntao Bai; Andy Jones; Kamal Ndousse; Amanda Askell; Anna Chen; Nova Dassarma; Dawn Drain; Stanislav Fort; Deep Ganguli; Tom Henighan; Nicholas Joseph; Saurav Kadavath; Jackson Kernion; Tom Conerly; Sheer El-Showk; Nelson Elhage; Zac Hatfield-Dodds; Danny Hernandez; Tristan Hume; Scott Johnston; Shauna Kravec; Liane Lovitt; Neel Nanda; Catherine Olsson; Dario Amodei; Tom Brown; Jack Clark; Sam Mccandlish; Chris Olah; Ben Mann; Jared Kaplan"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Open llm leaderboard",
+            "journal": "",
+            "year": "2023",
+            "authors": "Edward Beeching; Clémentine Fourrier; Nathan Habib; Sheon Han; Nathan Lambert; Nazneen Rajani; Omar Sanseviero; Lewis Tunstall; Thomas Wolf"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Experiment tracking with weights and biases",
+            "journal": "",
+            "year": "2020",
+            "authors": "Lukas Biewald"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Vicuna: An Open-Source chatbot impressing GPT-4 with 90%* ChatGPT quality",
+            "journal": "",
+            "year": "2022-10",
+            "authors": "Wei-Lin Chiang; Zhuohan Li; Zi Lin; Ying Sheng; Zhanghao Wu; Hao Zhang; Lianmin Zheng; Siyuan Zhuang; Yonghao Zhuang; Joseph E Gonzalez; Ion Stoica; Eric P Xing; Le Hou; Shayne Longpre; Barret Zoph; Yi Tay; William Fedus; Yunxuan Li; Xuezhi Wang; Mostafa Dehghani; Siddhartha Brahma; Albert Webson; Shane Shixiang; Zhuyun Gu; Mirac Dai; Xinyun Suzgun; Aakanksha Chen; Alex Chowdhery; Marie Castro-Ros; Kevin Pellat; Dasha Robinson; Sharan Valter; Gaurav Narang; Adams Mishra; Vincent Yu; Yanping Zhao; Andrew Huang; Hongkun Dai; Slav Yu; Ed H Petrov; Jeff Chi; Jacob Dean; Adam Devlin; Denny Roberts; Quoc V Zhou; Jason Le;  Wei"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Think you have solved question answering? try ARC, the AI2 reasoning challenge",
+            "journal": "",
+            "year": "2018",
+            "authors": "Peter Clark; Isaac Cowhey; Oren Etzioni; Tushar Khot; Ashish Sabharwal; Carissa Schoenick; Oyvind Tafjord"
+        },
+        {
+            "ref_id": "b7",
+            "title": "UltraFeedback: Boosting language models with highquality feedback",
+            "journal": "",
+            "year": "2023-10",
+            "authors": "Ganqu Cui; Lifan Yuan; Ning Ding; Guanming Yao; Wei Zhu; Yuan Ni; Guotong Xie; Zhiyuan Liu; Maosong Sun"
+        },
+        {
+            "ref_id": "b8",
+            "title": "FlashAttention-2: Faster attention with better parallelism and work partitioning. 2023. Harm De Vries. Go smol or go home",
+            "journal": "",
+            "year": "2023",
+            "authors": "Tri Dao"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Qlora: Efficient finetuning of quantized llms",
+            "journal": "",
+            "year": "2023",
+            "authors": "Tim Dettmers; Artidoro Pagnoni; Ari Holtzman; Luke Zettlemoyer"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Enhancing chat language models by scaling high-quality instructional conversations",
+            "journal": "",
+            "year": "2023-05",
+            "authors": "Ning Ding; Yulin Chen; Bokai Xu; Yujia Qin; Zhi Zheng; Shengding Hu; Zhiyuan Liu; Maosong Sun; Bowen Zhou"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Alpacafarm: A simulation framework for methods that learn from human feedback",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yann Dubois; Xuechen Li; Rohan Taori; Tianyi Zhang; Ishaan Gulrajani; Jimmy Ba; Carlos Guestrin; Percy Liang; Tatsunori B Hashimoto"
+        },
+        {
+            "ref_id": "b12",
+            "title": "Chain-of-thought hub: A continuous effort to measure large language models' reasoning performance",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yao Fu; Litu Ou; Mingyu Chen; Yuhao Wan; Hao Peng; Tushar Khot"
+        },
+        {
+            "ref_id": "b13",
+            "title": "The false promise of imitating proprietary LLMs",
+            "journal": "",
+            "year": "2023-05",
+            "authors": "Arnav Gudibande; Eric Wallace; Charlie Snell; Xinyang Geng; Hao Liu; Pieter Abbeel; Sergey Levine; Dawn Song"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Measuring massive multitask language understanding",
+            "journal": "",
+            "year": "2021",
+            "authors": "Dan Hendrycks; Collin Burns; Steven Basart; Andy Zou; Mantas Mazeika; Dawn Song; Jacob Steinhardt"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Lora: Low-rank adaptation of large language models",
+            "journal": "",
+            "year": "2021",
+            "authors": "Edward J Hu; Yelong Shen; Phillip Wallis; Zeyuan Allen-Zhu; Yuanzhi Li; Shean Wang; Lu Wang; Weizhu Chen"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Camels in a changing climate: Enhancing lm adaptation",
+            "journal": "",
+            "year": "2023",
+            "authors": "Hamish Ivison; Yizhong Wang; Valentina Pyatkin; Nathan Lambert; Matthew Peters; Pradeep Dasigi; Joel Jang; David Wadden; Noah A Smith; Iz Beltagy; Hannaneh Hajishirzi"
+        },
+        {
+            "ref_id": "b17",
+            "title": "",
+            "journal": "",
+            "year": "2023-10",
+            "authors": "Alexandre Albert Q Jiang; Arthur Sablayrolles; Chris Mensch; Devendra Bamford; Diego Singh Chaplot; Florian De Las Casas; Gianna Bressand; Guillaume Lengyel; Lucile Lample;  Saulnier; Renard Lélio; Marie-Anne Lavaud; Pierre Lachaux; Teven Stock; Thibaut Le Scao; Thomas Lavril; Timothée Wang; William El Lacroix;  Sayed"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Rewardbench: Evaluating reward models for language modeling",
+            "journal": "",
+            "year": "2024",
+            "authors": "Nathan Lambert; Valentina Pyatkin; Jacob Morrison; L J Miranda; Bill Yuchen Lin; Khyathi Chandu; Nouha Dziri; Sachin Kumar; Tom Zick; Yejin Choi; Noah A Smith; Hannaneh Hajishirzi"
+        },
+        {
+            "ref_id": "b19",
+            "title": "AlpacaEval: An automatic evaluator of instruction-following models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Xuechen Li; Tianyi Zhang; Yann Dubois; Rohan Taori; Ishaan Gulrajani; Carlos Guestrin; Percy Liang; Tatsunori B Hashimoto"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Measuring how models mimic human falsehoods",
+            "journal": "",
+            "year": "2022",
+            "authors": "Stephanie Lin; Jacob Hilton; Owain Evans;  Truthfulqa"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Introducing mpt-7b: A new standard for open-source, commercially usable llms",
+            "journal": "",
+            "year": "2023",
+            "authors": "M L Mosaic"
+        },
+        {
+            "ref_id": "b22",
+            "title": "GPT-4 technical report",
+            "journal": "",
+            "year": "2023-03",
+            "authors": ""
+        },
+        {
+            "ref_id": "b23",
+            "title": "Training language models to follow instructions with human feedback",
+            "journal": "",
+            "year": "2022-03",
+            "authors": "Long Ouyang; Jeff Wu; Xu Jiang; Diogo Almeida; Carroll L Wainwright; Pamela Mishkin; Chong Zhang; Sandhini Agarwal; Katarina Slama; Alex Ray; John Schulman; Jacob Hilton; Fraser Kelton; Luke Miller; Maddie Simens; Amanda Askell; Peter Welinder; Paul Christiano; Jan Leike; Ryan Lowe"
+        },
+        {
+            "ref_id": "b24",
+            "title": "The refinedweb dataset for falcon llm: Outperforming curated corpora with web data, and web data only",
+            "journal": "",
+            "year": "2023",
+            "authors": "Guilherme Penedo; Quentin Malartic; Daniel Hesslow; Ruxandra Cojocaru; Alessandro Cappelli; Hamza Alobeidli; Baptiste Pannier; Ebtesam Almazrouei; Julien Launay"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Direct preference optimization: Your language model is secretly a reward model",
+            "journal": "",
+            "year": "2023-05",
+            "authors": "Rafael Rafailov; Archit Sharma; Eric Mitchell; Stefano Ermon; Christopher D Manning; Chelsea Finn"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Zero: Memory optimizations toward training trillion parameter models",
+            "journal": "",
+            "year": "2020",
+            "authors": "Samyam Rajbhandari; Jeff Rasley; Olatunji Ruwase; Yuxiong He"
+        },
+        {
+            "ref_id": "b27",
+            "title": "",
+            "journal": "",
+            "year": "2021-10",
+            "authors": "Victor Sanh; Albert Webson; Colin Raffel; Stephen H Bach; Lintang Sutawika; Zaid Alyafeai; Antoine Chaffin; Arnaud Stiegler; Teven Le Scao; Arun Raja; Manan Dey; M Saiful Bari; Canwen Xu; Urmish Thakker; Shanya Sharma Sharma; Eliza Szczechla; Taewoon Kim; Gunjan Chhablani; Nihal Nayak; Debajyoti Datta; Jonathan Chang; Mike Tian-Jian; Han Jiang; Matteo Wang; Sheng Manica; Zheng Xin Shen; Harshit Yong; Rachel Pandey; Thomas Bawden; Trishala Wang; Jos Neeraj; Abheesht Rozen; Andrea Sharma; Thibault Santilli; Jason Fevry; Alan Fries; Ryan Teehan; Tali Bers; Stella Biderman; Leo Gao; Thomas Wolf; Alexander M Rush"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Proximal policy optimization algorithms",
+            "journal": "",
+            "year": "2017-07",
+            "authors": "John Schulman; Filip Wolski; Prafulla Dhariwal; Alec Radford; Oleg Klimov"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Chateval: A tool for chatbot evaluation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2019",
+            "authors": "Jo Ao Sedoc; Daphne Ippolito; Arun Kirubarajan; Jai Thirani; Lyle Ungar; Chris Callison-Burch"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Alpaca: A strong, replicable instructionfollowing model. Stanford Center for Research on Foundation Models",
+            "journal": "",
+            "year": "",
+            "authors": "Rohan Taori; Ishaan Gulrajani; Tianyi Zhang; Yann Dubois; Xuechen Li; Carlos Guestrin; Percy Liang; Tatsunori B Hashimoto"
+        },
+        {
+            "ref_id": "b31",
+            "title": "",
+            "journal": "Xwin-LM",
+            "year": "2023",
+            "authors": "Xwin-Lm Team"
+        },
+        {
+            "ref_id": "b32",
+            "title": "",
+            "journal": "",
+            "year": "2023-07",
+            "authors": "Hugo Touvron; Louis Martin; Kevin Stone; Peter Albert; Amjad Almahairi; Yasmine Babaei; Nikolay Bashlykov; Soumya Batra; Prajjwal Bhargava; Shruti Bhosale; Dan Bikel; Lukas Blecher; Cristian Canton Ferrer; Moya Chen; Guillem Cucurull; David Esiobu; Jude Fernandes; Jeremy Fu; Wenyin Fu; Brian Fuller; Cynthia Gao; Vedanuj Goswami; Naman Goyal; Anthony Hartshorn; Saghar Hosseini; Rui Hou; Hakan Inan; Marcin Kardas; Viktor Kerkez; Madian Khabsa; Isabel Kloumann; Artem Korenev; Punit Singh Koura; Marie-Anne Lachaux; Thibaut Lavril; Jenya Lee; Diana Liskovich; Yinghai Lu; Yuning Mao; Xavier Martinet; Todor Mihaylov; Pushkar Mishra; Igor Molybog; Yixin Nie; Andrew Poulton; Jeremy Reizenstein; Rashi Rungta; Kalyan Saladi; Alan Schelten; Ruan Silva"
+        },
+        {
+            "ref_id": "b33",
+            "title": "TRL: Transformer reinforcement learning",
+            "journal": "",
+            "year": "2020",
+            "authors": "Younes Leandro Von Werra; Lewis Belkada; Edward Tunstall; Tristan Beeching; Nathan Thrush; Shengyi Lambert;  Huang"
+        },
+        {
+            "ref_id": "b34",
+            "title": "GPT-J-6B: A 6 billion parameter autoregressive language model",
+            "journal": "",
+            "year": "2021",
+            "authors": "Ben Wang; Aran Komatsuzaki"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Self-Instruct: Aligning language models with Self-Generated instructions",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023-07",
+            "authors": "Yizhong Wang; Yeganeh Kordi; Swaroop Mishra; Alisa Liu; Noah A Smith; Daniel Khashabi; Hannaneh Hajishirzi"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Empowering large language models to follow complex instructions",
+            "journal": "",
+            "year": "",
+            "authors": "Can Xu; Qingfeng Sun; Kai Zheng; Xiubo Geng; Pu Zhao; Jiazhan Feng; Chongyang Tao; Daxin Jiang;  Wizardlm"
+        },
+        {
+            "ref_id": "b37",
+            "title": "HellaSwag: Can a machine really finish your sentence?",
+            "journal": "",
+            "year": "2019",
+            "authors": "Rowan Zellers; Ari Holtzman; Yonatan Bisk; Ali Farhadi; Yejin Choi"
+        },
+        {
+            "ref_id": "b38",
+            "title": "Judging LLM-as-a-Judge with MT-Bench and chatbot arena",
+            "journal": "",
+            "year": "2023-06",
+            "authors": "Lianmin Zheng; Wei-Lin Chiang; Ying Sheng; Siyuan Zhuang; Zhanghao Wu; Yonghao Zhuang; Zi Lin; Zhuohan Li; Dacheng Li; Eric P Xing; Hao Zhang; Joseph E Gonzalez; Ion Stoica"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Starling-7b: Improving llm helpfulness harmlessness with rlaif",
+            "journal": "",
+            "year": "2023-11",
+            "authors": "Banghua Zhu; Evan Frick; Tianhao Wu; Hanlin Zhu; Jiantao Jiao"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2 :2Figure2: The three steps of our method: (1) large scale, self-instruct-style dataset construction (UltraChat), followed by distilled supervised fine-tuning (dSFT), (2) AI Feedback (AIF) collection via an ensemble of chat model completions, followed by scoring by GPT-4 (Ultra-Feedback) and binarization into preferences, and (3) distilled direct preference optimization (dPO) of the dSFT model utilizing the feedback data.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 3 :3Figure 3: Impact on dSFT and dDPO training. (Left) Train and test set accuracy during dDPO training. (Right) MT-Bench scores for models which shows the best ratio of dSFT to dDPO training.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 4 :4Figure 4: Model samples on an MT-Bench prompt to show the dDPO model's ability to follow math instructions.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "Chat benchmark results for open-access and proprietary models on MT-Bench, AlpacaEval (original and with length correction), and Chatbot Arena. A dash (-) indicates model or alignment information that is not publicly available, or an evaluation that is absent on the public leaderboards. Scores marked with an asterisk ( * ) denote evaluations done by ourselves. Results are with models available at time of original release.",
+            "figure_data": "Size AlignMT-BenchAlpacaEvalChatbot Arena(score)(win %)(LC%)(ELO)StableLM-α7BdSFT2.75--842MPT-Chat Xwin-LM v0.17B 7BdSFT dPPO5.42 6.19  *-87.83 1.15-0.0928 -Mistral-Ins v0.1 7B-6.84--1004Zephyr7BdDPO7.3490.60 1.0376.31048Falcon-Instruct 40B dSFT5.1745.71 1.7539.11028 180BGuanaco65BSFT6.4171.80 1.5954.71028 33BLlama2-Chat70B RLHF6.8692.66 0.9174.11083Vicuna v1.333B dSFT7.1288.99 1.100.01089WizardLM v1.0 70B dSFT7.71--1103Xwin-LM v0.170B dPPO-95.57 0.720.0-GPT-3.5-turbo-RLHF7.9489.37 1.0881.71098Claude 2-RLHF8.0691.36 0.9974.31123GPT-4-RLHF8.9995.28 0.7286.51252"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Academic benchmark results for open models on the Open LLM Leaderboard.",
+            "figure_data": "Size AlignARCHella SwagMMLUTruthful QAStableLM-Tuned-α7BdSFT31.9153.5924.4140.37MPT-Chat7BdSFT46.5075.5137.6240.16Xwin-LM v0.17BdPPO56.5779.4049.9847.89Mistral-Instruct v0.1 7BdSFT54.5275.6355.3856.28Zephyr7BdDPO62.0384.5261.4457.44Falcon-Instruct40B dSFT61.6084.3155.4552.52Guanaco65B SFT65.4486.4762.9252.81Llama2-Chat70B RLHF67.3287.3369.8344.92Vicuna v1.333B dSFT62.1283.0059.2256.16WizardLM v1.070B dSFT64.0885.4064.9754.76Xwin-LM v0.170B dPPO70.2287.2569.7759.86ModelSize AlignTotal Chat Chat Hard Safety ReasoningCoherePPO85.69 94.765.190.398.2Starling34B dPPO 81.44 96.957.288.288.5RM-Mistral7BdPPO 79.29 96.958.187.177Tulu 270B dDPO 76.07 97.560.583.974.1Nous Hermes 27BdDPO 74.78 92.260.582.373.8Zephyr7BdDPO 71.77 95.362.76177.9Tulu 27BdDPO 71.67 97.556.173.371.8StableLM Zephyr 3BdDPO 70.63 86.360.170.375.7OasstPPO69.688.548.565.378UltraRM13B PPO69.53 96.158.654.365.4OLMo Instruct7BDPO66.69 89.750.762.371.7"
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "RewardBench results across categories for a selection of recent models. Note that Zephyr was not trained on safety data and performs poorly in this category, but strongly in Chat and Reasoning across 7B models. Other approaches, such as Tulu 2 and StableLM Zephyr, utilize a similar dDPO training procedure as described in this work.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Ablation of different alignment methods on the base Mistral 7B model.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "π dSFT = max π E (x,y)∼C log π(y|x)",
+            "formula_coordinates": [
+                4.0,
+                239.17,
+                173.03,
+                133.67,
+                17.18
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "s 1 ∼ π T (•|x, y 1 ), . . . , s 4 ∼ π T (•|x, y 4",
+            "formula_coordinates": [
+                4.0,
+                108.13,
+                312.42,
+                154.06,
+                12.55
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "r * (x, y) = β π * (y|x) π dSFT (y|x) + β log Z(x)",
+            "formula_coordinates": [
+                4.0,
+                226.94,
+                506.6,
+                158.03,
+                26.57
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "π θ = max π E (x,y w ,y l ) ∼D log σ β log π(y w |x) π dSFT (y w |x) -β log π(y l |x) π dSFT (y l |x) . (1",
+            "formula_coordinates": [
+                4.0,
+                155.12,
+                562.22,
+                346.01,
+                25.62
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": ")",
+            "formula_coordinates": [
+                4.0,
+                501.12,
+                569.28,
+                3.87,
+                9.58
+            ]
+        }
+    ],
+    "doi": ""
+}

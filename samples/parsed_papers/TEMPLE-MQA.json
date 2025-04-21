@@ -1,0 +1,941 @@
+{
+    "title": "Multi-hop Question Answering under Temporal Knowledge Editing",
+    "caption": "Overview of TEMPLE-MQA",
+    "authors": "Keyuan Cheng; Gang Lin; Haoyang Fei; Yuxuan Zhai; Lu Yu; Muhammad Asif Ali; Lijie Hu; Di Wang; Evan Williams; Tom Elon; Musk Google",
+    "pub_date": "",
+    "abstract": "Multi-hop question answering (MQA) under knowledge editing (KE) has garnered significant attention in the era of large language models. However, existing models for MQA under KE exhibit poor performance when dealing with questions containing explicit temporal contexts. To address this limitation, we propose a novel framework, namely TEMPoral knowLEdge augmented Multi-hop Question Answering (TEMPLE-MQA). Unlike previous methods, TEMPLE-MQA first constructs a time-aware graph (TAG) to store edit knowledge in a structured manner. Then, through our proposed inference path, structural retrieval, and joint reasoning stages, TEMPLE-MQA effectively discerns temporal contexts within the question query. Experiments on benchmark datasets demonstrate that TEMPLE-MQA significantly outperforms baseline models. Additionally, we contribute a new dataset, namely TKEMQA, which serves as the inaugural benchmark tailored specifically for MQA with temporal scopes.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": "Large Language Models (LLMs) have garnered widespread attention owing to their remarkable capacity for knowledge comprehension, enabling tailored solutions across various applications (Zhao et al., 2023;Huang & Chang, 2022). However, the presence of outdated knowledge presents a significant challenge, impeding the ability of LLMs to provide accurate responses regarding recent events and facts -a phenomenon known as hallucinations, wherein LLMs tend to fabricate plausible yet incorrect responses about unknown facts (Hong et al., 2023). Thus, ensuring the timely updating of LLMs with the latest information is of paramount importance. However, as the most direct approach for updating information, editing LLMs by re-training from scratch is practically infeasible, as it requires huge computational resources and substantial investments. In response, Knowledge Editing (KE) has emerged as a focal point, which aims to precisely modify or update the knowledge in LLMs without requiring model retraining. This topic has garnered considerable attention in recent years (Wang et al., 2023b;Zhang et al., 2024).\nMulti-hop question answering (MQA), on the other hand, aims to tackle complex inquiries that necessitate multiple reasoning steps. In the context of MQA, KE introduces the concept of \"ripple effects\", wherein a single edit may trigger a cascade of subsequent knowledge edits or updates (Cohen et al., 2023). For instance, if we update the knowledge about the U.S. president from Trump to Biden, correspondingly knowledge for the question: \"Who is the wife of the U.S. president?\" should also be updated (Cohen et al., 2023). There are two prominent lines of work in this area: parameter-based editing and memory-based editing. Parameter-based editing methods update the knowledge by directly modifying the parameters of the model (Meng et al., 2022a;b), while memory-based methods employ an explicit memory to store information about the facts to be modified (Mitchell et al., 2022; ",
+            "publication_ref": [
+                "b11",
+                "b8",
+                "b32",
+                "b4",
+                "b4",
+                "b21"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Time Conflit!",
+            "text": "Who was owner of Tom's company from 2018 to 2020?",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Retrieved Edit",
+            "text": "The owner of Twitter is Elon Musk after 2022.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Question",
+            "text": "Figure 1: Limitations of dense retrieval to handle temporal context. (a) There is a temporal constraint in question. However, the dense retrieval mechanism fails to accurately capture this temporal information, thus yielding an erroneous retrieval. (b) Our time-aware graph stores edits as a time-conscious knowledge structure to help distinguish temporal context and improve retrieval accuracy. Zhong et al., 2023;Gu et al., 2023). In most cases, the memory-based approaches outperform the parameter-based methods (Gu et al., 2023;Zhong et al., 2023) To address ripple effects, memory-based methods adopt a plan-and-solve paradigm (Khot et al., 2022;Wang et al., 2023a), wherein LLMs are prompted to decompose multi-hop questions into sub-questions, followed by iteratively answering each sub-question. These methods employ dense retrieval to identify relevant edits for each sub-question by comparing semantic similarities (Karpukhin et al., 2020). However, we observed that these approaches exhibit a key limitation, i.e., they perform poorly on questions with explicit temporal contexts (Yin et al., 2023). This inability to cater to temporal context is attributed to the dense retrieval employed by the memory-based methods, which primarily store the edit retrieval information in an unstructured format. This is illustrated in Figure 1 (a), where the dense retrieval retrieves an irrelevant fact (from the year 2022) for the question \"Who was the owner of Tom's company in 2020?\".\nTo address the aforementioned limitations, we propose a method called TEMPLE-MQA: TEMPoral knowLEdge augmented Multi-hop Question Answering. TEMPLE-MQA first constructs a time-aware graph (TAG) to store edit information in a structured format to effectively preserve context-specific temporal information in the best possible way (Figure 1 (b)). To enhance retrieval performance across semantically related edits, TEMPLE-MQA: (i) leveraging data augmentation techniques to capture aliases for entity names, aiding in entity disambiguation, and (ii) employing context-dependent concepts to explicitly filter edits based on contextual similarity. To tackle multi-hop questions, TEMPLE-MQA utilizes pre-trained LLMs to devise an inference path and conducts step-by-step joint reasoning, leveraging both LLMs and TAG to derive the final response. Experimental evaluation using benchmark data sets shows that TEMPLE-MQA outperforms the existing state-of-the-art approaches on MQA by a significant margin. We summarize the key contributions of this work as follows.\n• We propose TEMPLE-MQA, the first method capable of achieving high accuracy in MQA under a substantial volume of temporal knowledge edits without forgetting historical knowledge.\n• Unlike previous approaches, TEMPLE-MQA constructs a TAG to store structured information through our devised methods. Additionally, we propose a novel planning procedure and a joint reasoning approach for the inference path, alongside the development of a unique structural retrieval procedure tailored for knowledge retrieval, with potential applicability to other problems.\n• Extensive experimental results on two benchmark datasets show that TEMPLE-MQA outperforms the previous seven baselines via different metrics for MQA under massive edits. Furthermore, we develop a new dataset, namely TKEMQA, which serves as the first benchmark on MQA with temporal scopes.",
+            "publication_ref": [
+                "b35",
+                "b5",
+                "b5",
+                "b35",
+                "b14",
+                "b13",
+                "b31"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": "Parameter-based Editing. Parameter-editing approaches aim to update a model by incorporating information about updated data or knowledge while ensuring minimal changes to predictions on other data points. These approaches can be categorized into fine-tuning, locating and editing, and meta-learning methods. Fine-tuning methods utilize new knowledge to fine-tune the model parameters while at the same time combating catastrophic forgetting (Chen et al., 2020;Zhu et al., 2020). Locate and edit approaches treat the layers of a feed-forward network as primary knowledge storage units and update their parameters to edit knowledge. Examples include ROME (Meng et al., 2022a) and its extended version, MEMIT (Meng et al., 2022b), which targets a large number of edits. Huang et al. (2024) investigated the generalization aspects of knowledge edits, while Li et al. (2023) proposed PMET for precise updating of FFN weights. Hu et al. (2024) proposed a wise-layer KE method to facilitate lifelong editing. METO (Yin et al., 2023) employs time information as an optimization goal to learn new knowledge without forgetting historical information. Metalearning approaches treat the editing task as a machine learning challenge, with examples including hyper-networks trained with constrained optimization for fact-only modification (Cao et al., 2021), belief-graph by Hase et al. (2021), and context-aware meta-learned loss scaling by Hu et al. (2023). However, these methods often underperform for MQA under KE, primarily because the update in the model parameters is more effective for single-hop settings and hard to adapt for multi-hop questions requiring complex reasoning. In contrast, TEMPLE-MQA stores the edits in an edit memory alongside a reasoning link, enabling the decomposition and step-by-step solution of multi-hop questions.\nMemory-based Editing. These techniques store edits in explicit memory and utilize retrieval-augmented methods to reason over relevant edits and modulate end predictions of the model. For instance, SERAC (Mitchell et al., 2022) introduces semi-parametric editing coupled with a retrieval-augmented counterfactual model. GRACE (Hartvigsen et al., 2022) embeds additional adapters within LLMs for editing, using vector matching to locate and modify edited knowledge. IKE (Zheng et al., 2023) employs in-context learning based on demonstration storage to edit the model's knowledge. MeLLo (Zhong et al., 2023) is a simple memory-based approach that stores all edited facts externally and prompts the language model during inference. Additionally, Zhong et al. (2023) also introduces the MQUAKE benchmark for evaluating the MQA performance of their model. Recently, PokeMQA (Gu et al., 2023) proposes a two-stage process of decoupling self-checking and sub-question decomposition to enhance retrieval performance. DeepEdit (Wang et al., 2024) utilizes a depth-first constrained decoding method to edit knowledge for MQA. Tilp (Xiong et al., 2023) provides a differentiable method for learning temporal knowledge graphs in KGs. TEILP (Xiong et al., 2024b) proposes a logical reasoning framework for time prediction in temporal knowledge graphs. TG-LLM (Xiong et al., 2024a) proposes a framework that enhances temporal reasoning capabilities in large language models. Note that, unlike existing solutions, TEMPLE-MQA does not require sub-problem decomposition but generates an inference path directly, which is more straightforward and can directly generate a complete plan. Moreover, the structural retrieval method proposed by our TEMPLE-MQA does not require fine-tuning compared to PokeMQA, making it applicable to a broader range of scenarios, including the processing of temporal information.",
+            "publication_ref": [
+                "b36",
+                "b36",
+                "b12",
+                "b17",
+                "b9",
+                "b31",
+                "b1",
+                "b7",
+                "b10",
+                "b21",
+                "b6",
+                "b34",
+                "b35",
+                "b35",
+                "b5",
+                "b27",
+                "b28"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Preliminaries",
+            "text": "Notations. We represent the set of facts as If one of the steps (s i , r i , o i ) in Q is associated with a fact edit f i ∈ F , it causes ripple effects, i.e., all subsequent facts have to be updated in order to derive the final answer to the question. Mathematically, a chain of facts in Q coupled with corresponding fact edits may be represented as: \nD = {(s, r, o)} ⊆ E × R × E ,\n⟨(s 1 , r 1 , o 1 ), • • • , (s i , r i , o * i ), • • • , (s * n , r n , o * n )⟩.\n⟨(s 1 , r 1 , o 1 , τ 1,s , τ 1,e ), • • • , (s i , r i , o * i , τ * 1,s , τ * 1,e ), • • • , (s * n , r n , o * n , τ * n,s , τ * n,e )⟩.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "TEMPLE-MQA",
+            "text": "TEMPLE-MQA is a generalized memory-based editing method. It is capable of MQA under knowledge editing (including knowledge correction and updating, etc.) without forgetting historical knowledge. As shown in Figure 2, the core components of TEMPLE-MQA include pre-existing LLMs and a Time Aware Graph (TAG). The workflow of TEMPLE-MQA is summarized as follows: (i) Constructing a TAG for the given edits; (ii) Utilizing LLMs to devise an inference path for each multi-hop question; (iii) Finally, employing the LLMs along with TAG via our proposed structural retrieval mechanism for joint reasoning based on the inference path. We will discuss each component in detail.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Time-Aware Graph Construction",
+            "text": "The objective of the graph construction process is to design a mechanism to store knowledge edits in a structured format, facilitating effective and efficient retrieval. It is worth noting that this approach markedly differs from existing approaches, which predominantly store knowledge edits in an unstructured format (Zhong et al., 2023). For example, \"The president of the U.S. is Joe Biden.\" is an unstructured text format, while (U.S., president is, Joe Biden) is structured. This distinction proves crucial in overcoming the challenge of handling temporal contexts for KE.\nHistorical and current facts are typically stored in unstructured text form as f old and f cur .\nThe graph construction process initially transforms them into structured form F t (detailed in Section 3.2). Then it utilizes these structured temporal edits F t as input and generates a graph G t as output. The process flow is elucidated as follows.\nConverting unstructured facts to a structured form. First, we employ a pre-trained LLM to convert all unstructured facts f x (include f old and f cur ) into a structured form to explicate the information content across different dimensions. To achieve this, we design an incontext learning prompt (see Appendix A for details) that prompts an LLM to process the unstructured fact.\ns, r, o, τ s , τ e , c(o) = LLM(P convert ( f x )),(1)\nWhere f x denotes the unstructured fact, LLM yields a structured output (s, r, o, τ s , τ e , c(o)).\nHere, c(o) represents the concept associated with the object entity o Ali et al. ( 2020), and P convert is the in-context learning prompt. We use GPT-3.5-turbo-instruct as the pre-trained LLM. Finally, for all pairs of historical and current facts ( f old , f cur ), via our above procedure, we can get the set of structured temporal fact edits\nF t = { f x → (s, r, o, τ s , τ e )}.\nIt is notable that compared to the original temporal fact, here we also include the concept information for the object, c(o), with the fact structure. It provides multi-faceted benefits, including (i) disambiguation of the entities to their appropriate concepts based on the context and (ii) improved performance for edit retrieval by offering a wide range of fine-grained concepts (Ling & Weld, 2012). For instance, in different contexts, the entity \"Washington\" can refer to a city name or a person's name, and without including the concept c(o), explicitly storing this information poses a challenge to distinguishing between them.",
+            "publication_ref": [
+                "b35",
+                "b16"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Data augmentation.",
+            "text": "The purpose of data augmentation is to capture different possible lexical variations for the same entity. This step is pivotal for improving retrieval performance, as it assists in filtering out edits with subjects different from the query subject. This eventually helps reduce the search space by filtering numerous irrelevant edits. We utilize SPARQL (detailed in Appendix E) to get all possible aliases of the subject entity s from Wikidata, denoted as A(s) = {s 0 , s 1 , s 2 , • • • }, where s 0 = s and s i is the i-th alias for s. Note that the current formulation of TEMPLE-MQA favors data augmentation on the subject dimension.\nGraph construction. Finally, we utilize the structured information about historical and current knowledge to construct the TAG G t . Specifically, we store the current knowledge as {(n s :\ns i , e : (r, c(o), τ * s , τ * e )\n, n e : o * )} for s i ∈ A(s), and the historical knowledge as {(n s : s i , e : (r, c(o), τ s , τ e ), n e : o)} for s i ∈ A(s). Here n s , e, and n o represent the start node, edge, and end node in G t , respectively. We can also use the above steps to construct graphs for non-temporal edits with the distinction that we exclude temporal scopes. In this scenario, we only store the updated knowledge as {(n s : s i , e : (r, c(o)), n e : o * )} for s i ∈ A(s). Note, for G, we only store current knowledge.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Planning and Reasoning on Inference Path",
+            "text": "In this section, we introduce the planning and reasoning stages of TEMPLE-MQA: i) The planning stage leverages LLMs to generate an inference path P and extract temporal scope for the question Q. ii) The reasoning stage performs a step-by-step joint reasoning by utilizing LLMs and the TAG we constructed in Section 4.1 to solve the question Q using the inference path P. We will discuss them in detail.\nStage 1: Inference Path. This stage aims to exploit the instruction-following ability of LLMs to generate a structural inference path P that is helpful for answering Q. To achieve this, we design an in-context learning prompt (explained in Appendix A) that prompts the LLMs to generate an inference path along with the temporal scopes, as shown below.  where P infer is the in-context prompt for Q used as input for LLM, yielding the inference path P and temporal scopes τ Q s and τ Q e as outputs. P is represented as\nP, τ Q s , τ Q e = LLM(P infer (Q)),(2)\n⟨(s 1 , r 1 , c(o 1 )), • • • , (c(o n-1 ), r n , c(o n )⟩,\nwhere s 1 is an entity extracted from question Q.\nNote that, unlike previous research, our approach is more practical and efficient, as it computes the inference path in one go without needing to alternate between plan and solve phases. The inference path has the concept of entity added among the relation compared to the relation path Luo et al. (2023), which helps us in retrieval.\nStage 2: Joint Reasoning. As an iterative process, this stage aims to obtain the final answer for Q by reasoning on P.\nConsider the i-th step (1 ≤ i ≤ n), we utilize (s i , r i , c(o i ), τ Q s , τ Q e )\nas input to infer the specific entity o i , where s i is the output of last step o i-1 (i > 1) or start point s 1 in P, r i and c(o i ) originate from P. For this, TEMPLE-MQA uses the structural retrieval R struct (Section 4.3) to retrieve relevant knowledge from the G t for the query.\no * R , α R = R struct (s i , r i , c(o i ), τ Q s , τ Q e ),(3)\nwhere o * R is the possible updated knowledge about o i , and α R denotes the similarity between updated knowledge and query. Note that in our approach, there is no need to use selfchecking Zhong et al. (2023) to check if the retrieved fact contradicts the generated answer. Underlying reason for this is the fact that many sota LLMs are trained using RLHF, due to which they exhibit a higher tendency to reject external knowledge that contradicts their own knowledge.\nFinally, based on the similarity score α R compared against a threshold (θ), we decide if we may use retrieved knowledge as such or use the language model for response generation:\no i = o * R α R > θ M query (P query (s i , r i , c(o i ), τ s , τ e )) α R ≤ θ, (4\n)\nwhere M query is an LLM , and P query is the prompt for query (details are given in Appendix A). We re-iterate the above-mentioned process until we completely exhaust the inference path P, yielding o n as the final answer.",
+            "publication_ref": [
+                "b17",
+                "b35"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Structural Retrieval",
+            "text": "Given a query (s i , r i , c(o i ), τ Q s , τ Q e )\n, this section introduces how to retrieve the knowledge from G t using structural retrieval R struct . The workflow of R struct (See Figure 3) can be represented by the following steps: (i) Extracting a subgraph, i.e., filtering out the knowledge that does not meet the required subject and temporal scope. (ii) Re-ranking, i.e., re-ranking the remaining knowledge based on semantic similarity of relation and concept with query.\nStep 1: Extracting a Subgraph. This step extracts a 1-hop subgraph G sub from G t by filtering out relation pairs violating the subject and temporal scopes. Formally, this is represented as:\nG sub = {(n s , e, n e ) ∈ G t | (n s == s i ) ∧ (e[τ s ] ≥ τ Q s ) ∧ (e[τ e ] ≤ τ Q e )},(5)\nwhere n s indicates the subject and (e[τ s ], e[τ e ]) represent the temporal scope of the fact.\nStep 2: Re-ranking. This step aims to re-rank the candidate answers and find the one with the highest similarity. For this, we first use an existing encoder E to encode the relation and concept for the query, as follows:\nv q r = E(r i ); v q c(o) = E(c(o i )).(6)\nFinally, we re-rank knowledge in G sub based on the cosine similarity (sim) for both relation and fine-grained concept between knowledge and query and then select the knowledge with the highest similarity as the retrieved result.\no * R , α R = arg max (n s ,e,n e )∈G sub (sim(E(e[r]), v q r ) + sim(E(e[c(o)]), v q c(o) )). (7\n)\nWhere o * R is the retrieved object, and α R is the corresponding similarity returned by R struct , e[r] and e[c(o)] indicate relation and concept of the knowledge.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments",
+            "text": "Here we conduct practical evaluations for TEMPLE-MQA compared against different baseline models. Additional results, including the ablation study, can be found in Appendix C.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimental Settings",
+            "text": "Datasets. We evaluate TEMPLE-MQA on a blend of publicly available benchmarks and self-curated datasets. These include: MQUAKE (Zhong et al., 2023), ATOKE (Yin et al., 2023), and our newly proposed dataset TKEMQA. Detailed descriptions and statistics of the datasets are given in Appendix B.1 and D.\nBaselines. We compare the performance of TEMPLE-MQA against a wide range of parameter-based and memory-based KE methods. The parameter-based baselines include: Fine-tuning (FT) Zhu et al. (2020), ROME (Meng et al., 2022a), MEMIT (Meng et al., 2022b), MEND Mitchell et al. (2021) and METO (Yin et al., 2023). The memory-based baselines include: MeLLo (Zhong et al., 2023), and PokeMQA (Gu et al., 2023). Details are given in Appendix B.2.\nEvaluation metrics. Similar to the baseline models, we use five different evaluation metrics: (i) Multi-hop Accuracy (M-Acc) (Zhong et al., 2023), (ii) Hop-wise Accuracy (H-Acc) (Gu et al., 2023), (iii) Historical Explicit time Question Score (HES) (Yin et al., 2023), (iv) Current Explicit time Question Score (CES) (Yin et al., 2023), (v) Historical Explicit time Question Score (CES-P) (Yin et al., 2023), (vi) Current Relative time Question Score (CRS) (Yin et al., 2023), and (vii) Historical Relative time Question Score (HRS) (Yin et al., 2023). For all metrics, a larger value indicates that the method is better. Details of evaluation metrics are given in Appendix B.3.\nExperimental setup. To evaluate performance with varying numbers of edits, we follow the setting of PokeMQA (Gu et al., 2023) to conduct stratified sampling (Parsons, 2014) of the dataset based on the number of hops in questions. This allows us to construct edit batches of different sizes while ensuring a relatively consistent proportion of questions with different hop counts within each batch. We inject all the edits within a batch simultaneously (Zhong et al., 2023). The scenarios of different batch sizes are denoted as M-edited (M ∈ {1, 100, All}). We use LLaMa-2-7B (Touvron et al., 2023), Vicuna-7B (Chiang et al., 2023), GPT-turbo-3.5-instruct and GPT-J-6B Wang & Komatsuzaki (2021) as the LLMs and utilize all-MiniLM-L12-v21 as the encoder in our method. We conducted each experiment four times and reported the average values in the table. All experiments are performed using PyTorch 2.1.2 and RTX 4090 24GB GPU. show that TEMPLE-MQA consistently outperforms the baseline models across different settings by a large margin. For example, when consider the MQUAKE-CF-3K dataset and M-Acc as the evaluation metric, TEMPLE-MQA on average improved by 91.2%, 112.7% and 101.4% compared to Mello for {1, 100, All}-edited respectively across three LLMs, and by 42.6%, 32.4%, and 28.6% compared to PokeMQA. We attribute such drastic performance improvement to the following factors: (a) The inference path employed by TEMPLE-MQA is more reliable, which helps the model to boost the end performance significantly; (b) The structural retrieval pipeline (i.e., TAG) designed for TEMPLE-MQA is robust to reduce the number of false positives significantly. We provide an analysis of these factors in Section 5.3.",
+            "publication_ref": [
+                "b35",
+                "b31",
+                "b36",
+                "b31",
+                "b35",
+                "b5",
+                "b35",
+                "b5",
+                "b31",
+                "b31",
+                "b31",
+                "b31",
+                "b31",
+                "b5",
+                "b35",
+                "b23",
+                "b3",
+                "b24"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimental Results",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Non",
+            "text": "Compared TEMPLE-MQA with different LLMs, we can see it exhibits superior performance on GPT-3.5-turbo-instruct followed by Vicuna-7B. This is due to the fact that GPT-3.5-turboinstruct has the strongest reasoning capabilities Chiang et al. (2023), enabling our model to generate more reliable inference paths. Another noteworthy observation in Table 1 is that parameter-based approaches perform poorly compared to memory-based ones, which is consistent with the results in (Zhong et al., 2023).\nSingle-hop MQA under Temporal KE. We then consider single-hop question answering with temporal knowledge, whose results for ATOKE are shown in Table 3. Compared to Table 1, the results show varying behavior, with parameter-based approaches outperforming memory-based methods in some cases, which is contributed by their stronger ability to retain updated knowledge. Specifically, we can see that parameter-based approaches (such as ROME and MEMIT) can achieve very good performance for CES and CES-P, indicating that they can effectively inject new knowledge into the model. However, they perform poorly on the HES metric: even after using METO, the average HES is only 30.5%. This indicates that these methods forget historical knowledge after editing.\nOn the other hand, MeLLo and PokeMQA achieved higher HES scores but lower CES scores, indicating they are unable to distinguish historical knowledge and edited knowledge. TEMPLE-MQA can take into account both historical and new knowledge. It not only has higher HES than MeLLo and PokeMQA but also maintains high CES. Specifically, on ATOKE-SE, TEMPLE-MQA achieves HES of 97.25, an improvement of 221% compared to MEMIT METO . The reason for such a big improvement is that TEMPLE-MQA can effectively distinguish different knowledge in the same time chain through TAG.\nMQA under Temporal KE. We finally consider the performance on TKEMQA, which consist of {1, 2, 3, 4}-hops equation answering with temporal knowledge. The results are shown in Table 2. We can see that similar to the above results, TEMPLE-MQA achieves good performance for M-Acc. However, TEMPLE-MQA is worse than MeLLo for HES in the All-edited setting using GPT. This is because there is no historical knowledge matching the question in the edit memory in such a setting. MeLLo's utilization of a self-checking method effectively validates the retrieved results, contributing to its superiority. Table 3: Experiment results on ATOKE. METO is a plug-and-play method to strengthen the memory of historical knowledge. We mark the METO untested results as \"-\". ATOKE-ME indicates each data includes two edits to perform continuous knowledge updating.\nMoreover, in contrast to the previous two datasets, we find that TEMPLE-MQA on TKEMQA experiences only a slight performance decrease when the edit batch size increases. We further conduct an experiment to study the performance w.r.t. difference edit numbers (see Figure 4 in Appendix). It can be observed from Figure 4 (a) and Figure 4 (b) that as the number of edits increases, the performance of TEMPLE-MQA drops rapidly on the MQUAKE-CF-3K. We find that this is because MQUAKE-CF-3K has unpassable data in the mass-edit setting. Specifically, there are data that are affected by the editing of other data. Under M-edited (M > 1) settings, if they are in the same batch, unpassable data will be generated (see Appendix Table 15 for an example). To verify this, we filter out conflicting data and create a new data MQUAKE-CF-3K-FIX. The result is shown in Figure 4 (c). After repairing, we can observe that TEMPLE-MQA is more stable than other methods, which illustrates the accuracy of structural retrieval.",
+            "publication_ref": [
+                "b3",
+                "b35"
+            ],
+            "figure_ref": [
+                "fig_2",
+                "fig_2",
+                "fig_2",
+                "fig_2"
+            ],
+            "table_ref": [
+                "tab_4",
+                "tab_4",
+                "tab_5",
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "Abalation Study",
+            "text": "We first conduct an ablation study on different modules of the structural retrieval: without filtering sub-graphs according to the subject entity (i.e. -w/o Subject), without considering the similarity of relation in the Re-ranking step (i.e. -w/o Relation), without considering the similarity of the concept of object entity (i.e. -w/o Concept).\nThe results are shown in Table 10 in Appendix. First, we investigate the role of filtering subgraphs. We can see without filtering out the sub-graph through the subject, TEMPLE-MQA decreased by an average of 8.6% and 7.8% on M-Acc and H-Acc. This is the most impactful component among all removals. Second, we can see both relation and concept can improve the performance of TEMPLE-MQA in all the settings, indicating its necessity. Third, the impact of all eliminated components will become larger as the edit memory increases. Subsequently, we conduct an ablation study on inference path planning module, with details as follows: (1) Replacing inference path planning with sub-question decomposition by Zhong et al. (2023) (i.e., -w/o inference path). (2) Exploring the influence of k-shot (k ∈ {1, 2, 4}) on in-context learning prompt. Corresponding results are shown in Table 11 in Appendix. These results show, if we exclude the inference path planing, the M-ACC drops by almost 15.44%, 14.39%, 9.53% respectively. Also, the M-ACC drops about 10.43%, 7.77% and 3.51% for k-shot (k ∈ {1, 2, 4}) settings.\nThus more examples can help LLMs follow instructions better, also the quality and diversity of the examples is important.",
+            "publication_ref": [
+                "b35"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_9",
+                "tab_10"
+            ]
+        },
+        {
+            "heading": "Conclusion",
+            "text": "We presented a novel framework TEMPLE-MQA for MQA under temporal knowledge editing. TEMPLE-MQA first constructs a time-aware graph, then utilizes inference paths, structural retrieval, and joint reasoning, capable of enhancing MQA performance while distinguishing the temporal context. We also proposed a benchmark TKEMQA, which is the first benchmark specified for MQA with temporal scopes. Experiments on TKEMQA and the existing two benchmarks demonstrated that TEMPLE-MQA outperforms previous methods.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Limitations",
+            "text": "Our work poses following limitations and we will resolve them in our future works:\n• Temple-MQA relies on TAG, which brings additional computational overhead.\n• Temple-MQA requires writing prompts manually to adapt to different tasks.\n• Although retrieval of Temple-MQA doesn't need fine-tuning an encoder, it has a complex workflow. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Details of Prompts in TEMPLE-MQA",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B Experimental Details",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.1 Dataset",
+            "text": "We provide a detailed description of the evaluation datasets as follows.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.2 Baseline Models",
+            "text": "(a) Parameter-based. The parameter-based baselines include: (i) Fine-tuning (FT) (Zhu et al., 2020) that performs a gradient-based update on the model parameters to incorporate new knowledge. (ii) ROME (Meng et al., 2022a) first locates factual knowledge at a specific layer of the transformer architecture and then updates the feed-forward network of this layer to insert new knowledge. (iii) MEMIT (Meng et al., 2022b) extends ROME to allow modifying a range of feed-forward network layers for a large amount of knowledge. (iv) MEND Mitchell et al. (2021) learns a hyper network to produce weight updates by decomposing the gradient of standard fine-tuning into a low-rank form. (v) METO (Yin et al., 2023) extends the parameter-based methods by adding the time information as an optimization objective.\n(b) Memory-based. The memory-based baselines include: (i) MeLLo (Zhong et al., 2023) that uses the plan-and-solve paradigm. (ii) PokeMQA (Gu et al., 2023) extends MeLLo by adopting a two-stage retrieval process to decouple the question decomposition and knowledge editing.",
+            "publication_ref": [
+                "b36",
+                "b20",
+                "b31",
+                "b35",
+                "b5"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.3 Evaluation Metrics",
+            "text": "Details about the evaluation metrics and their mathematical formulation are provided as follows:\n(i) Multi-hop Accuracy (M-Acc), which is used to measure the accuracy of the language models on multi-hop questions. For M-Acc, we use the same settings as Zhong et al. (2023).\nThe calculation formula for M-Acc is as follows:\n1   q∈Q [ f * (q) = a * ]   .(8)\nWhere f * (•) represents the edited model, Q and a * represent the multi-hop questions and the edited answer for each case, respectively.\n(ii) Hop-wise Accuracy (H-Acc), which is used to check the correctness of the intermediate reasoning path for MQA. For H-Acc, we follow the same settings proposed by Gu et al. (2023). Given edited chain of facts C * , H-Acc is defined as\n1   (s,r,o * )∈C * [ f * (s, r) = o * ]   .(9)\n(iii) Historical Explicit time Question Score (HES), which is the accuracy of explicit temporal questions about historical knowledge (Yin et al., 2023).\n(iv) Current Explicit time Question Score (CES), which measures the accuracy of explicit temporal questions about current knowledge (Yin et al., 2023).\n(v) Current Explicit time Paraphrase Question Score (CES-P), which is the accuracy of explicit temporal questions of semantic paraphrasing asked about current knowledge (Yin et al., 2023).\nHES, CES, and CES-P require the model to be able to recall knowledge at a specific temporal scope, calculated according to the following formula:\n1 [ f * (s, r, τ s , τ e ) = o] .(10)",
+            "publication_ref": [
+                "b35",
+                "b5",
+                "b31",
+                "b31",
+                "b31"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C More Experiment Results",
+            "text": "Data Conflict in MQUAKE. In the analysis for MQA under Temporal KE, we observed that TEMPLE-MQA on TKEMQA experiences only a slight performance decrease when the edit batch size increases, while its decrease is faster for MQUAKE. This is because MQUAKE-CF-3K has unpassable data in the mass-edit setting, i.e., we can observe data   conflicts in MQUAKE. These conflicts arise from inconsistent counterfactual edits between two cases containing the same knowledge (i.e., one is edited, but another is not edited). Under mass editing settings, the inference process of one case may be influenced by the editing of another case, leading to incorrect answers. Table 15 provides an example of data conflict in MQUAKE.\nCost of Inference Path. Here, we aim to compare the expense and time cost of our inference path to those of previous methods. According to  the inference path, while Mello and PokeMQA need to call LLMs multiple times to generate sub-questions. Thus, we claim TEMPLE-MQA offers a faster and more cost-effective solution.\nAccuracy of Structured Retrieval. To achieve reliable KE, apart from the correct decomposition of sub-problems, another important factor is whether related edits can be found correctly. Here, we conduct experiments to compare the accuracy of the retrieval process for different methods. According to Table 14, TEMPLE-MQA achieve higher retrieval accuracy compared to Mello and PokeMQA by 17.9% and 7.7% in the all-edited setting, respectively. Thus, our structured retrieval can efficiently find structured edits.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4",
+                "tab_13"
+            ]
+        },
+        {
+            "heading": "TEMPLE-MQA under Different Hop Numbers.",
+            "text": "Here, we aim to study the performance of different models with different hop numbers. As shown in Figure 5, TEMPLE-MQA can still maintain a high M-Acc as the number of hops increases, while Mello and PokeMQA experience an obvious decline in performance with an increase in hop number. This is because Mello and PokeMQA couple the tasks of querying the LLM to answer sub-questions and generate sub-questions together. As the hop number increases, the LLM is burdened with complex tasks, causing a significant decrease in M-Acc. In contrast, TEMPLE-MQA decouples the generation of inference paths, enabling it to maintain high performance as the hop number increases. TEMPLE-MQA under Implicit Time. For questions with hidden time, we consider the following examples: 1) \"Who was the U.S. president before Biden?\", 2) \"Who was the previous president of the U.S.?\".\nFor example 1, TEMPLE-MQA needs to determine the specific time when Biden is president. We can revise the ICL prompt to achieve it, as show in below: Question: Who was the U.S. president before Biden? Time: Biden is president after 2021, Thus time span is <2017,2020>. Inference Path: <U.S.,president is,?>. However, we observe some datasets contain questions that are more ambiguous, as shown in examples 2. Answer to these questions is decided on the training periods of LLMs. For this, we need to give current time to LLM, as shown in below: Question: Who was the previous president of the U.S.? Time: Today is 2021, and Biden is current president, Thus time span is <2017,2020>. Inference Path: <U.S.,president is,?>.\nThe results on the AToke-SE and AToke-ME with ambiguous hidden time (like example 2) are shown in Table 12. We can see that TEMPLE-MQA still performs better, especially on the HRS metric.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_3"
+            ],
+            "table_ref": [
+                "tab_11"
+            ]
+        },
+        {
+            "heading": "D.1 Introduction to TKEMQA",
+            "text": "Our benchmark TKEMQA is created based on Wikidata2 , a knowledge base consisting of fact triples associated with millions of entities. TKEMQA can be used to evaluate whether the knowledge editing method can update new knowledge without forgetting past knowledge. It contains simple single questions and multi-hop questions, and its rich settings enable it to comprehensively evaluate knowledge editing methods.\nAs shown in Table 9, TKEMQA contains 2,000 data where each one includes a k-hop (k ∈ {1, 2, 3, 4}) questions. As GPT-3.5 does not have the knowledge after 2022, we use the knowledge after 2022 as an edit to update knowledge. Thus, we refer to each multi-hop question as a current question because it has a time prompt after 2022. Besides the updated knowledge, we also introduce the corrective knowledge, which is used to modify the error historical knowledge. This knowledge does not need temporal scope and is counterfactual.\nTo evaluate whether the editing method may cause model forget the historical knowledge (i.e. knowledge of model before the editing), each data of TKEMQA include two historical question with the time prompt before 2022. Based on TKEMQA, we add the knowledge corresponding to the historical question into the edit memory to evaluate whether the retrieval can effectively distinguish different knowledge in the same time chain, in which we refer to as TKEMQA-HK.\nWe use M-Acc and HES as two metrics in TKEMQA. M-Acc is the accuracy of the language models on current multi-hop questions, evaluating the model's ability to update knowledge and perform multi-hop reasoning successfully. HES is the accuracy of answering historical questions and assessing the model's ability to recall historical knowledge.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "D.2 TKEMQA Data Curation",
+            "text": "Collect relation template. We first manually collect multiple relations containing time information from WikiData, e.g. \"President is\" (Appendix D.3). Then, we use SPARQL to sample facts based on the relation and subject entity. For example, given a query (U.S., President is, ?), WikiData will return every president of the U.S. and their terms of office. In addition, we select common relations and entities to control quality.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Generate relation path template.",
+            "text": "In order to generate natural and coherent multi-hop questions, we look for high-quality relation path Luo et al. (2023) with different lengths k ∈ {1, 2, 3, 4}. (live in, the father is) is a bad path because the object type of 'life in' (location) does not match the subject type of 'father is' (person); a location cannot have a father. Thus, we arrange and combine the collected relations into a relation path template and filter out unreasonable relation combinations. For each relation path, we can get several fact chains based on different start point entities.\nGenerate multi-hop questions. Then, we use GPT-4 to convert the relation path template into questions in natural language form, e.g., (father is, company is) -> \"What is the company of father of {}?\". Replace \"{}\" into the start point entity to get the final questions. We also conduct manual revisions to ensure its quality. Different from existing work (Zhong et al., 2023), this method produces data with higher quality questions due to the powerful capabilities of GPT-4. This method also helps reduce the additional overhead of using GPT-4 because one path often correspond to multiple data items.\nAdditional details for edits. Among the collected fact chains, there is only one piece of knowledge that is after 2023, which is used to represent the knowledge update of the real world.\nD.3 Question/Cloze Statement Templates used in TKEMQA Following previous work, we use question templates to filter the facts that cannot be recalled and cloze-style statement templates to convert an edited fact into a natural language form",
+            "publication_ref": [
+                "b17",
+                "b35"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "",
+            "text": "Acknowledgements. Di Wang, Lijie Hu and Muhammad Asif Ali are supported in part by the baseline funding BAS/1/1689-01-01, funding from the CRG grand URF/1/4663-01-01, FCC/1/1976-49-01 from CBRC and funding from the AI Initiative REI/1/4811-10-01 of King Abdullah University of Science and Technology (KAUST). Di Wang is also supported by the funding of the SDAIA-KAUST Center of Excellence in Data Science and Artificial Intelligence (SDAIA-KAUST AI). We also acknowledge support from OpenAI API Researcher Access Program.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Datasets",
+            "text": "#Edits 2-hop 3-hop 4-hop Total (a) MQUAKE (Zhong et al., 2023). MQUAKE includes MQUAKE-CF-3K based on counterfactual editing and MQUAKE-T based on real-world changes. These datasets encompass k-hop questions (k ∈ {2, 3, 4}), each associated with one or more edits. Statistics are shown in Table 7.\n(b) ATOKE (Yin et al., 2023). ATOKE is the first temporal knowledge editing dataset containing a series of world knowledge with timestamps, regarded as a series of knowledge updates. ATOKE contains three editing types: single edit (SE), multiple edits (ME), and extending edit (EE), corresponding to three datasets ATOKE-SE, ATOKE-ME and ATOKE-EE. Statistics of these three datasets are shown in Table 8.\n• ATOKE-SE. Each data of this dataset includes one edit for knowledge updating and a historical question and current question corresponding to the time scope before and after the modification.\n• ATOKE-ME. Each data of this dataset includes two edits to perform continuous knowledge updating, two historical questions, and one current question.\n• ATOKE-EE. Each data of this datasets include one edit to modify the time scope of knowledge (not updating the object), and only one current question.\nIt is worth explaining that the above three datasets are all aimed at single-hop questions only.\n(c) TKEMQA. TKEMQA is our newly curated benchmark dataset. It is a blend of carefully crafted multi-hop questions with explicit temporal scopes. This data set is designed to evaluate the ability of KE methods rigorously. TKEMQA-HK provides additional knowledge corresponding to two historical questions on the basis of TKEMQA, which is used to explore whether the memory-based method will confuse the temporal context. See Section D for a detailed introduction, construction process, and statement temples of TKEMQA.   ",
+            "publication_ref": [
+                "b35",
+                "b31"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Description",
+            "text": "This SPARQL query is used to extract object entities and their corresponding time scopes based on subject entity id (denoted by \"<QID>\") and relation id (denoted by \"<PID>\").\nTable 18: The SPARQL we used to create TKEMQA.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Unstructured Form Structured Form",
+            "text": "From 1993 to 1999, Donald Trump's spouse is Marla Maples. (Donald Trump, spouse, person, 1993, 1999, Marla Maples) In 2020, the head coach of AC Horsens is Jonas Dal.\n(AC Horsens, head coach, person, 2020, 2020, Jonas Dal) After 2023, the head of government in Slovakia is Robert Fico. (Slovakia, head of government, person, 2023, N/A, Robert Fico) Before 1936, the head of state in United Kingdom is George V. (United Kingdom, head of state, person, N/A, 1936, George V) The capital of United Kingdom is London.\n(United Kingdom, capital, city, N/A, N/A, Londo) ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Fine-grained named entity typing over distantly supervised data based on refined representations",
+            "journal": "",
+            "year": "2020",
+            "authors": "Muhammad Asif; Ali ; Yifang Sun; Bing Li; Wei Wang"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Editing factual knowledge in language models",
+            "journal": "",
+            "year": "2021",
+            "authors": "Nicola De Cao; Wilker Aziz; Ivan Titov"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Recall and learn: Fine-tuning deep pretrained language models with less forgetting",
+            "journal": "",
+            "year": "2020",
+            "authors": "Sanyuan Chen; Yutai Hou; Yiming Cui; Wanxiang Che; Ting Liu; Xiangzhan Yu"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Vicuna: An open-source chatbot impressing gpt-4 with 90%* chatgpt quality",
+            "journal": "",
+            "year": "2023-03",
+            "authors": "Wei-Lin Chiang; Zhuohan Li; Zi Lin; Ying Sheng; Zhanghao Wu; Hao Zhang; Lianmin Zheng; Siyuan Zhuang; Yonghao Zhuang; Joseph E Gonzalez; Ion Stoica; Eric P Xing"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Evaluating the ripple effects of knowledge editing in language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Roi Cohen; Eden Biran; Ori Yoran; Amir Globerson; Mor Geva"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Pokemqa: Programmable knowledge editing for multi-hop question answering",
+            "journal": "",
+            "year": "2023",
+            "authors": "Hengrui Gu; Kaixiong Zhou; Xiaotian Han; Ninghao Liu; Ruobing Wang; Xin Wang"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Aging with grace: Lifelong model editing with discrete key-value adaptors",
+            "journal": "",
+            "year": "2022",
+            "authors": "Thomas Hartvigsen; Swami Sankaranarayanan; Hamid Palangi; Yoon Kim; Marzyeh Ghassemi"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Do language models have beliefs? methods for detecting, updating, and visualizing model beliefs",
+            "journal": "",
+            "year": "2021",
+            "authors": "Peter Hase; Mona T Diab; Asli Celikyilmaz; Xian Li; Zornitsa Kozareva; Veselin Stoyanov; Mohit Bansal; Srini Iyer"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Faithful question answering with monte-carlo planning",
+            "journal": "",
+            "year": "2023",
+            "authors": "Ruixin Hong; Hongming Zhang; Honghui Zhao; Dong Yu; Changshui Zhang"
+        },
+        {
+            "ref_id": "b9",
+            "title": "",
+            "journal": "",
+            "year": "2024",
+            "authors": "Chenhui Hu; Pengfei Cao; Yubo Chen; Kang Liu; Jun Zhao;  Wilke"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Meta-learning online adaptation of language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Nathan J Hu; Eric Mitchell; Christopher D Manning; Chelsea Finn"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Towards reasoning in large language models: A survey",
+            "journal": "",
+            "year": "2022",
+            "authors": "Jie Huang; Kevin Chen; -Chuan Chang"
+        },
+        {
+            "ref_id": "b12",
+            "title": "See the unseen: Better context-consistent knowledge-editing by noises",
+            "journal": "",
+            "year": "2024",
+            "authors": "Youcheng Huang; Wenqiang Lei; Zheng Zhang; Jiancheng Lv; Shuicheng Yan"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Dense passage retrieval for open-domain question answering",
+            "journal": "",
+            "year": "2020",
+            "authors": "Vladimir Karpukhin; Sewon Barlas O Guz; Patrick Min; Ledell Lewis; Yu Wu; Sergey Edunov; Danqi Chen; Wen Tau; Yih "
+        },
+        {
+            "ref_id": "b14",
+            "title": "Decomposed prompting: A modular approach for solving complex tasks",
+            "journal": "",
+            "year": "2022",
+            "authors": "H Tushar Khot; Matthew Trivedi; Yao Finlayson; Kyle Fu; Peter Richardson; Ashish Clark;  Sabharwal"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Pmet: Precise model editing in a transformer",
+            "journal": "",
+            "year": "2023",
+            "authors": "Xiaopeng Li; Shasha Li; Shezheng Song; Jing Yang; Jun Ma; Jie Yu"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Fine-grained entity recognition",
+            "journal": "",
+            "year": "2012",
+            "authors": "Xiao Ling; Daniel Weld"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Reasoning on graphs: Faithful and interpretable large language model reasoning",
+            "journal": "",
+            "year": "2023",
+            "authors": "Linhao Luo; Yuan-Fang Li; Gholamreza Haffari; Shirui Pan"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Locating and editing factual associations in gpt",
+            "journal": "",
+            "year": "2022",
+            "authors": "Kevin Meng; David Bau; Alex Andonian; Yonatan Belinkov"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Massediting memory in a transformer",
+            "journal": "",
+            "year": "2022",
+            "authors": "Kevin Meng; Sen Arnab; Alex J Sharma; Yonatan Andonian; David Belinkov;  Bau"
+        },
+        {
+            "ref_id": "b20",
+            "title": "",
+            "journal": "",
+            "year": "2021",
+            "authors": "Eric Mitchell; Charles Lin; Antoine Bosselut; Chelsea Finn; Christopher D Manning"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Memory-based model editing at scale",
+            "journal": "",
+            "year": "2022",
+            "authors": "Eric Mitchell; Charles Lin; Antoine Bosselut; Christopher D Manning; Chelsea Finn"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Stratified sampling. Wiley StatsRef: Statistics Reference Online",
+            "journal": "",
+            "year": "2014",
+            "authors": " Van L Parsons"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Llama 2: Open foundation and fine-tuned chat models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Hugo Touvron; Louis Martin; Kevin R Stone; Peter Albert; Amjad Almahairi; Yasmine Babaei; Nikolay Bashlykov; Soumya Batra; Prajjwal Bhargava; Shruti Bhosale; Daniel M Bikel; Lukas Blecher; Cantón Cristian; Moya Ferrer; Guillem Chen; David Cucurull; Jude Esiobu; Jeremy Fernandes; Wenyin Fu; Brian Fu; Cynthia Fuller; Vedanuj Gao; Naman Goswami; Anthony S Goyal; Saghar Hartshorn; Rui Hosseini; Hakan Hou; Marcin Inan; Viktor Kardas; Madian Kerkez; Isabel M Khabsa; A V Kloumann; Punit Korenev; Marie-Anne Singh Koura; Thibaut Lachaux; Jenya Lavril; Diana Lee; Yinghai Liskovich; Yuning Lu; Xavier Mao; Todor Martinet; Pushkar Mihaylov; Igor Mishra; Yixin Molybog; Andrew Nie; Jeremy Poulton; Rashi Reizenstein; Kalyan Rungta; Alan Saladi; Ruan Schelten; Eric Silva; R Michael Smith; Xia Subramanian; Binh Tan; Ross Tang; Adina Taylor; Jian Williams; Puxin Xiang Kuan; Zhengxu Xu; Iliyan Yan; Yuchen Zarov; Angela Zhang; Melanie Fan; Sharan Kambadur; Aurelien Narang; Robert Rodriguez; Sergey Stojnic; Thomas Edunov;  Scialom"
+        },
+        {
+            "ref_id": "b24",
+            "title": "GPT-J-6B: A 6 Billion Parameter Autoregressive Language Model",
+            "journal": "",
+            "year": "2021-05",
+            "authors": "Ben Wang; Aran Komatsuzaki"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Plan-and-solve prompting: Improving zero-shot chain-of-thought reasoning by large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Lei Wang; Wanyu Xu; Yihuai Lan; Zhiqiang Hu; Yunshi Lan; Roy ; Ka-Wei Lee; Ee-Peng Lim"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Knowledge editing for large language models: A survey",
+            "journal": "",
+            "year": "2023",
+            "authors": "Song Wang; Yaochen Zhu; Haochen Liu; Zaiyi Zheng; Chen Chen"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Deepedit: Knowledge editing as decoding with constraints",
+            "journal": "",
+            "year": "2024",
+            "authors": "Yiwei Wang; Muhao Chen; Nanyun Peng; Kai Wei; Chang "
+        },
+        {
+            "ref_id": "b28",
+            "title": "TILP: Differentiable learning of temporal logical rules on knowledge graphs",
+            "journal": "",
+            "year": "2023",
+            "authors": "Siheng Xiong; Yuan Yang; Faramarz Fekri; James Clayton; Kerce "
+        },
+        {
+            "ref_id": "b29",
+            "title": "Large language models can learn temporal reasoning",
+            "journal": "",
+            "year": "2024",
+            "authors": "Siheng Xiong; Ali Payani; Ramana Kompella; Faramarz Fekri"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Teilp: Time prediction over knowledge graphs via logical reasoning",
+            "journal": "",
+            "year": "2024",
+            "authors": "Siheng Xiong; Yuan Yang; Ali Payani; James C Kerce; Faramarz Fekri"
+        },
+        {
+            "ref_id": "b31",
+            "title": "History matters: Temporal knowledge editing in large language model",
+            "journal": "",
+            "year": "2023",
+            "authors": "Xunjian Yin; Jin Jiang; Liming Yang; Xiaojun Wan"
+        },
+        {
+            "ref_id": "b32",
+            "title": "A comprehensive study of knowledge editing for large language models",
+            "journal": "",
+            "year": "2024",
+            "authors": "Ningyu Zhang; Yunzhi Yao; Bo Tian; Peng Wang; Shumin Deng; Meng Wang; Zekun Xi; Shengyu Mao; Jintian Zhang; Yuansheng Ni; Siyuan Cheng; Ziwen Xu; Xin Xu; Jia-Chen Gu; Yong Jiang; Pengjun Xie; Fei Huang; Lei Liang; Zhiqiang Zhang; Xiao-Jun Zhu; Jun Zhou; Huajun Chen"
+        },
+        {
+            "ref_id": "b33",
+            "title": "A survey of large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Kun Wayne Xin Zhao; Junyi Zhou; Tianyi Li; Xiaolei Tang; Yupeng Wang; Yingqian Hou; Beichen Min; Junjie Zhang; Zican Zhang; Yifan Dong; Chen Du; Yushuo Yang; Z Chen; Jinhao Chen; Ruiyang Jiang; Yifan Ren; Xinyu Li; Zikang Tang; Peiyu Liu; Jianyun Liu; Ji Nie; Wen Rong"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Can we edit factual knowledge by in-context learning?",
+            "journal": "",
+            "year": "2023",
+            "authors": "Ce Zheng; Lei Li; Qingxiu Dong; Yuxuan Fan; Zhiyong Wu; Jingjing Xu; Baobao Chang"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Assessing knowledge editing in language models via multi-hop questions",
+            "journal": "",
+            "year": "2023",
+            "authors": "Zexuan Zhong; Zhengxuan Wu; Christopher D Manning; Christopher Potts; Danqi Chen;  Mquake"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Modifying memories in transformer models",
+            "journal": "",
+            "year": "2020",
+            "authors": "Chen Zhu; Ankit Singh Rawat; Manzil Zaheer; Srinadh Bhojanapalli; Daliang Li; Felix X Yu; Sanjiv Kumar"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 3 :3Figure3: The workflow of structural retrieval. 1) The first step is to extract the 1-hop sub-graph where the center point is Tom. We filter out the edits not conforming with the temporal scope of the query. 2) The second step calculates the semantic similarity of the relation and concept between the query and knowledeg in sub-graph.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 4 :4Figure 4: The line graph depicting the decrease in M-Acc with the increase in edit batch size on datasets MQUAKE-CF-3K, TKEMQA and MQUAKE-CF-3K-FIX.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 5 :5Figure 5: A bar graph comparing the M-Acc of three methods under two settings: All-edited for TEMPLE-MQA and 1-edited for MQUAKE-CF-3K.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": ", τ e ) ∈ D t represents a temporal fact, with subject entity s, object entity o, having relation r with temporal scope from τ s to τ e . We use G t to represent the time aware graph constructed using D t (Section 4.1). KE request can be represented asF = { f 1 , f 2 , • • • f n },which contains a set of fact edits. Each edit f i ∈ F represents an individual knowledge editing ), indicating that the object of the subject s with relation r is updated from o to o * .MQA under KE.A multi-hop question Q requires multiple reasoning steps to derive the final answer. The reasoning steps could be represented as a chain of facts ⟨(s 1 , r 1 , o 1 ), • • • , (s n , r n , o n )⟩, where each step (hop) in the chain (s i , r i , o i ) associated with an individual fact. The subject and object are chained together, i.e., the object (o i ) from the preceding fact becomes the subject (s i+1 ) for the subsequent fact.",
+            "figure_data": "Planningcompany_isowner_isKnowledge EditConstructFigure 2: Overview of TEMPLE-MQA. Given a multi-hop question, TEMPLE-MQA employsLLMs to strategize an inference path for the question. Then, it leverages LLMs and the TAG(G t ) for joint reasoning on the inference path.operation, denoted by f i = (s, r, o) → (s, r, owhere E , R denotethe set of entities and relations respectively. A tuple (s, r, o) ∈ D represents a fact, withsubject entity s and object entity o having relation r. For the temporal facts, we add timeinformation to D, i.e., D t = {(s, r, o, τ s , τ e )} ⊆ E × R × E × T × T , where T represents thetimestamps. A tuple (s, r, o, τ s 3.1 Knowledge Editing and MQA"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Note that Q may initiate multiple fact edits in F . The end goal of MQA under KE is to derive the final answer o * In KE under temporal scope, we use F t = { f 1 , • • • , f n } to represent the temporal fact edits, with a single temporal fact edit denoted by f i = (s, r, o, τ s , τ e ) → (s, r, o * , τ * s , τ * e ). It means that (s, r, o) is valid from τ s until τ e , and after that (s, r, o",
+            "figure_data": "Q after considering all associated edits in F .n for3.2 Temporal ScopeTemporal KE."
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "We initially test the performance of TEMPLE-MQA for non-temporal MQA, whose results for MQUAKE are shown in Table1. These results clearly",
+            "figure_data": "MQUAKE-CF-3KMQUAKE-TMethod1-edited100-editedAll-edited1-editedAll-editedM-Acc H-Acc M-Acc H-Acc M-Acc H-Acc M-Acc H-Acc M-Acc H-AccFT  *  ROME  *  MEMIT  *28.20 13.13 14.977.3 5.37 6.432.37 3.50 9.40LLAMA-2 0.03 0.03 2.47-3.63 2.30-0.1 0.3756.48 24.89 30.8933.89 17.99 23.981.02 1.71 25.210.37 0.32 20.13MeLLo PoKeMQA  *33.57 44.139.9 30.620.00 37.3310.07 27.8317.33 32.839.9 23.8765.78 75.4355.27 60.4457.69 74.3644.55 60.22TEMPLE-MQA (Ours)68.3259.4648.9535.1742.2027.5177.5664.8775.7362.30MeLLo  *  PoKeMQA  *30.70 45.8320.84 34.8324.75 38.77VICUNA-7B 12.25 22.35 31.23 31.6310.18 25.360.72 74.5748.55 55.1951.55 73.0742.97 55.09TEMPLE-MQA (Ours)71.6162.7556.6544.2646.6037.3381.7769.4678.2968.15MeLLo  *  PoKeMQA  *57.43 67.2728.8 56.37GPT-3.5-TURBO-INSTRUCT 40.87 28.13 35.27 56.00 49.63 48.8725.3 39.7788.12 78.1652.84 68.0974.57 76.9853.53 67.88TEMPLE-MQA (Ours)78.1163.4567.2155.3353.6840.0590.5781.9082.2674.33"
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "Experimental results for MQUAKE. We boldface the best-performing scores with the second-best underlined. The result from the previous paper is marked as *. By default, the same symbols are used in the following tables.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "Experimental results on TKEMQA.",
+            "figure_data": "TKEMQATKEMQA-HKMethod1-edited100-editedAll-edited1-edited100-editedAll-editedM-Acc HES M-Acc HES M-Acc HES M-Acc HES M-Acc HES M-Acc HESVICUNAMeLLo39.0236.5431.7135.5625.5132.2125.7662.7618.5360.2615.2156.89PoKeMQA36.6533.1230.1531.9023.0229.5622.1357.8320.3556.7116.9452.61TEMPLE-MQA (Ours)52.1835.6550.4134.6248.1334.5151.9277.5150.1375.5948.2075.52GPT-3.5-TURBO-INSTRUCTMeLLo82.1437.7559.1737.1947.5336.5756.0473.4438.2272.6331.4570.75PoKeMQA70.1827.8553.5424.5543.8020.2650.2767.9133.8364.3727.4260.65TEMPLE-MQA (Ours)85.5341.2683.4738.7580.5033.1185.5182.2884.1282.2280.0981.61MethodATOKE-SEATOKE-MEATOKE-EECES CES-P HESCES CES-P HESCES CES-PFT  *  MEND  *  ROME  *  MEMIT  *  FT METO  *  MEND METO ROME METO  *   *  MEMIT METO  *GPT-J-6B & 1-EDITED 5.69 0.06 1.11 80.47 40.56 5.73 1.73 71.83 27.96 1.18 99.99 97.01 2.41 98.85 91.54 99.66 92.23 2.22 98.42 91.06 2.8 2.62 3.38 1.27 1.2 83.26 33.45 30.14 70.52 28.41 28.65 0.03 0.40 91.94 62.48 3.41 2.91 0.44 99.93 98.70 0.48 99.92 95.82 1.64 ----99.95 93.78 20.25 99.93 90.97 23.22 --86.4 85.32 30.31 92.73 85.75 36.2 --GPT-J-6B & ALL-EDITEDMello83.78 81.55 48.19 60.82 59.15 25.65 99.97 98.60PokeMQA90.91 87.66 62.49 72.73 70.92 40.99 99.87 98.62TEMPLE-MQA (Ours) 97.95 95.88 97.25 96.46 95.62 96.43 99.92 98.76"
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "Unstructured fact: From 2009 to 2017, Obama was the president of the United States. Structural form: <United States, the president is, person, 2009, 2017, Obama> Unstructured fact: From 2019 to 2022, the head of government in kazakhstan is Askar Mamin. The prompts P convert to convert knowledge used in Equation (1). [Demo] include several high-quality demonstrations handwritten by humans. <Fact> indicates the unstructured fact f x . More examples are shown in Table19.",
+            "figure_data": "Structural form: <Kazakhstan, head of government, person, 2019, 2022, Askar Mamin>...Other demo ...[Instruction]Please refer to the above demo and convert the following edit into the structural form:<subject, relation, type of object, start time, end time, object>[Task]<Fact>[Demo]Question: Who was the owner of Tom's company from 2018 to 2020?Inference path: <Tom, company is, company>, <company, owner is, people>Time: 2018, 2020[Demo]Inference step: <United Kingdom, head of government, person>Time: from 2019 to 2022Answer: Boris JohnsonInference step: <Christian Wulff, spouse, person>Time: after 2023Answer: Bettina Wulff...Other demo...[Instruction]Please generate a valid answer like the above example for the following task:[Task]<Inference step><Time>"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "The prompt P query for",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_8",
+            "figure_caption": "",
+            "figure_data": "(4),where <Inference step> indicates specific inference step in the inference path, <Time>indicates temporal scope."
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "Ablation study result of TEMPLE-MQA.",
+            "figure_data": "MQUAKE-CF-3KMQUAKE-TMethod1-edited100-editedAll-edited1-editedAll-editedM-Acc H-Acc M-Acc H-Acc M-Acc H-Acc M-Acc H-Acc M-Acc H-Acc-w/o Subject77.9662.8562.0651.1644.0934.2389.5680.7773.9766.56-w/o Relation77.7862.6765.1552.8849.5336.5189.7280.8077.1368.49-w/o Concept78.0863.0265.7053.2950.1037.5590.0181.3578.6770.20TEMPLE-MQA78.1163.4567.2155.3353.6840.0590.5781.9082.2674.33MQUAKE-CF-3KMethod1-edited 100-edited All-edited-w/o inference path62.6752.8244.331-shot65.7155.1246.872-shot69.4858.7247.484-shot73.9364.6349.91TEMPLE-MQA(8-shot)78.1167.2153.68"
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "table",
+            "figure_id": "tab_10",
+            "figure_caption": "The ablation result of inference path planning on MQUAKE-CF-3K with metric of M-Acc.",
+            "figure_data": "ATOKEMethodCRS(SE) HRS(SE) CRS(ME) HRS(ME)MEND+25.4130.1721.8430.83ROME+78.8816.2982.4018.18MEMIT+74.0724.3273.5826.04TEMPLE-MQA85.8178.2387.7480.92"
+        },
+        {
+            "figure_label": "12",
+            "figure_type": "table",
+            "figure_id": "tab_11",
+            "figure_caption": "The results on the AToke-SE and AToke-ME.",
+            "figure_data": "Method2-hop3-hop4-hopCost($) Time(s) Cost($) Time(s) Cost($) Time(s)Mello0.738.980.9412.131.6116.41PokeMQA0.9310.331.0911.981.3618.85TEMPLE-MQA0.152.500.255.310.276.98"
+        },
+        {
+            "figure_label": "13",
+            "figure_type": "table",
+            "figure_id": "tab_12",
+            "figure_caption": "Average expense and time cost comparison of methods on the MQUAKE-CF-3K dataset for solving per multi-hop problem in the same experimental environment.",
+            "figure_data": "Method1-edited100-editedAll-editedR-Acc M-Acc H-Acc R-Acc M-Acc H-Acc R-Acc M-Acc H-AccMello91.657.4328.883.140.8728.1374.535.2725.3PokeMQA95.267.2756.3789.556.0049.6381.548.8739.77TEMPLE-MQA99.578.1163.4593.267.2155.3387.853.6840.05"
+        },
+        {
+            "figure_label": "14",
+            "figure_type": "table",
+            "figure_id": "tab_13",
+            "figure_caption": "Retrieval accuracy of different methods on the MQUAKE-CF-3K dataset. R-Acc refers to the accuracy of retrieving edited facts from memory.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_14",
+            "figure_caption": "Table 13, we can easily see that, for MQUAKE-CF-3K, TEMPLE-MQA averagely saves 78.7% and 80.4% of the expense compared to Mello and PokeMQA, respectively, and reduces the inference time by 62.9% and 64.8%. The reason is that TEMPLE-MQA only needs to call LLMs once to generate",
+            "figure_data": "M-ACC(%)40 60 80 10096.595.885.9 TKEMQA all-edited 76.1 46.1 29.1 34.3 40.2 GPT-3.5-TURBO-INSTRUCT 63.5 92.5 TEMPLE-MQA MELLO POKEMQAM-ACC(%)40 60 80 10090.542.3 MQuAKE-CF-3K 1-edited 56.2 GPT-3.5-TURBO-INSTRUCT 73.6 70.3 68.4 73.9 84.9 TEMPLE-MQA 48.6 MELLO POKEMQA2013.913.52001-hop2-hop3-hop4-hop02-hop3-hop4-hop"
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "D = {(s, r, o)} ⊆ E × R × E ,",
+            "formula_coordinates": [
+                3.0,
+                293.07,
+                611.37,
+                125.98,
+                9.9
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "⟨(s 1 , r 1 , o 1 ), • • • , (s i , r i , o * i ), • • • , (s * n , r n , o * n )⟩.",
+            "formula_coordinates": [
+                4.0,
+                209.88,
+                392.63,
+                185.9,
+                14.35
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "⟨(s 1 , r 1 , o 1 , τ 1,s , τ 1,e ), • • • , (s i , r i , o * i , τ * 1,s , τ * 1,e ), • • • , (s * n , r n , o * n , τ * n,s , τ * n,e )⟩.",
+            "formula_coordinates": [
+                4.0,
+                129.67,
+                521.71,
+                296.18,
+                14.4
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "s, r, o, τ s , τ e , c(o) = LLM(P convert ( f x )),(1)",
+            "formula_coordinates": [
+                5.0,
+                224.78,
+                222.82,
+                280.22,
+                10.72
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "F t = { f x → (s, r, o, τ s , τ e )}.",
+            "formula_coordinates": [
+                5.0,
+                332.16,
+                287.19,
+                118.1,
+                10.56
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "s i , e : (r, c(o), τ * s , τ * e )",
+            "formula_coordinates": [
+                5.0,
+                152.15,
+                489.51,
+                89.92,
+                13.44
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": "P, τ Q s , τ Q e = LLM(P infer (Q)),(2)",
+            "formula_coordinates": [
+                5.0,
+                244.07,
+                719.66,
+                260.93,
+                14.39
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "⟨(s 1 , r 1 , c(o 1 )), • • • , (c(o n-1 ), r n , c(o n )⟩,",
+            "formula_coordinates": [
+                6.0,
+                108.13,
+                295.38,
+                167.07,
+                11.08
+            ]
+        },
+        {
+            "formula_id": "formula_8",
+            "formula_text": "Consider the i-th step (1 ≤ i ≤ n), we utilize (s i , r i , c(o i ), τ Q s , τ Q e )",
+            "formula_coordinates": [
+                6.0,
+                222.81,
+                373.11,
+                281.94,
+                14.14
+            ]
+        },
+        {
+            "formula_id": "formula_9",
+            "formula_text": "o * R , α R = R struct (s i , r i , c(o i ), τ Q s , τ Q e ),(3)",
+            "formula_coordinates": [
+                6.0,
+                229.45,
+                424.63,
+                275.54,
+                14.89
+            ]
+        },
+        {
+            "formula_id": "formula_10",
+            "formula_text": "o i = o * R α R > θ M query (P query (s i , r i , c(o i ), τ s , τ e )) α R ≤ θ, (4",
+            "formula_coordinates": [
+                6.0,
+                199.53,
+                547.56,
+                301.59,
+                26.09
+            ]
+        },
+        {
+            "formula_id": "formula_11",
+            "formula_text": ")",
+            "formula_coordinates": [
+                6.0,
+                501.12,
+                556.22,
+                3.87,
+                9.58
+            ]
+        },
+        {
+            "formula_id": "formula_12",
+            "formula_text": "Given a query (s i , r i , c(o i ), τ Q s , τ Q e )",
+            "formula_coordinates": [
+                6.0,
+                108.0,
+                629.29,
+                149.55,
+                14.14
+            ]
+        },
+        {
+            "formula_id": "formula_13",
+            "formula_text": "G sub = {(n s , e, n e ) ∈ G t | (n s == s i ) ∧ (e[τ s ] ≥ τ Q s ) ∧ (e[τ e ] ≤ τ Q e )},(5)",
+            "formula_coordinates": [
+                6.0,
+                160.06,
+                719.66,
+                344.94,
+                14.26
+            ]
+        },
+        {
+            "formula_id": "formula_14",
+            "formula_text": "v q r = E(r i ); v q c(o) = E(c(o i )).(6)",
+            "formula_coordinates": [
+                7.0,
+                246.08,
+                135.94,
+                258.92,
+                16.83
+            ]
+        },
+        {
+            "formula_id": "formula_15",
+            "formula_text": "o * R , α R = arg max (n s ,e,n e )∈G sub (sim(E(e[r]), v q r ) + sim(E(e[c(o)]), v q c(o) )). (7",
+            "formula_coordinates": [
+                7.0,
+                172.2,
+                191.21,
+                328.93,
+                24.47
+            ]
+        },
+        {
+            "formula_id": "formula_16",
+            "formula_text": ")",
+            "formula_coordinates": [
+                7.0,
+                501.13,
+                195.2,
+                3.87,
+                9.58
+            ]
+        },
+        {
+            "formula_id": "formula_17",
+            "formula_text": "1   q∈Q [ f * (q) = a * ]   .(8)",
+            "formula_coordinates": [
+                16.0,
+                258.69,
+                353.51,
+                246.3,
+                34.13
+            ]
+        },
+        {
+            "formula_id": "formula_18",
+            "formula_text": "1   (s,r,o * )∈C * [ f * (s, r) = o * ]   .(9)",
+            "formula_coordinates": [
+                16.0,
+                243.86,
+                464.18,
+                261.13,
+                34.22
+            ]
+        },
+        {
+            "formula_id": "formula_19",
+            "formula_text": "1 [ f * (s, r, τ s , τ e ) = o] .(10)",
+            "formula_coordinates": [
+                16.0,
+                259.63,
+                634.42,
+                245.37,
+                12.97
+            ]
+        }
+    ],
+    "doi": ""
+}

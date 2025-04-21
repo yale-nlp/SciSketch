@@ -1,0 +1,1068 @@
+{
+    "title": "Learning From Correctness Without Prompting Makes LLM Efficient Reasoner",
+    "caption": "The framework of LECO",
+    "authors": "Yuxuan Yao; Biyan Zhou; Sichun Luo; Linqi Song; Han Wu; Zhijiang Guo; Jiahui Gao; Xiaojin Fu; Hanxu Hou",
+    "pub_date": "",
+    "abstract": "Large language models (LLMs) have demonstrated outstanding performance across various tasks, yet they still exhibit limitations such as hallucination, unfaithful reasoning, and toxic content. One potential approach to mitigate these issues is learning from human or external feedback (e.g. tools). In this paper, we introduce an intrinsic self-correct reasoning framework for LLMs that eliminates the need for human feedback, external tools, and handcraft prompts. The proposed framework, based on a multi-step reasoning paradigm Learning from Correctness (LECO), improves reasoning performance without needing to learn from errors. This paradigm prioritizes learning from correct reasoning steps, and a unique method to measure confidence for each reasoning step based on generation logits. Experimental results across various multi-step reasoning tasks demonstrate the effectiveness of the framework in improving reasoning performance with reduced token consumption. The code is available at https://github.com/starrYYxuan/LeCo.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": "Large language models (LLMs; Brown et al. 2020;OpenAI 2023;Touvron et al. 2023) have exhibited remarkable performance on a diverse range of natural language processing benchmarks (Hendrycks et al., 2021a;Srivastava et al., 2022) and also showcased promising results on real-world applications (Wu et al., 2023;Thirunavukarasu et al., 2023). However, it is imperative to acknowledge that LLMs still possess certain limitations. For instance, the occurrence of undesirable behaviors like hallucinations (Rawte et al., 2023), generating harmful content (Bai et al., 2022), and non-adherence to established rules and constraints (Ouyang et al., 2022;Peng et al., 2023) remains largely unexplored.\nOne extensively employed approach to address these problems is learning from feedback (Pan et al., 2023). It involves guiding LLMs to improve their responses through a cycle of trial, examination, and correction. During the examination phase, feedback is provided to",
+            "publication_ref": [
+                "b4",
+                "b19",
+                "b47",
+                "b38",
+                "b8"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "INPUT:",
+            "text": "While not stop_criteria():",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "OUTPUT:",
+            "text": "So, he spends 2+1=3 hours each time.\n1.74\nStep3: Jim does this 3 times a week, so he spends a total of 3*3=9 hours per week on TV and reading each week. 1.72\nStep4: In 4 weeks, Jim spends a total of 4*9=36 hours on …",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "1.69",
+            "text": "Step5: The answer is \\box{36}. identify the shortcomings in the trial answer and guide the necessary corrections. Prior efforts (Huang et al., 2023a;Gou et al., 2023a) have confirmed high-quality feedback can offer valuable insights into further corrections. Although human feedback (Ouyang et al., 2022;Fernandes et al., 2023) and external tools feedback (Gou et al., 2023a;b) are generally valuable, they are either expensive to collect or heavily dependent on the abilities of the selected tools. To eliminate external intervention, another popular line of research is selfcorrection, where the model progressively learns from the feedback it generates internally, without relying on external sources (An et al., 2023). However, Huang et al. (2023b) recently suggests that LLMs do not possess the inherent capabilities to find the errors and rectify their responses just by designing the prompts. More frustratingly, these methods often require creating extensive and elaborate handcraft prompts to guide the model in acquiring and understanding the feedback, which is a time-consuming and labor-intensive process, finally tuning our researchers into \"prompt engineers\".\nIn this work, we present a novel intrinsic self-correct reasoning framework that eliminates the need for human feedback, external tools, and handcraft prompts. Different from the existing self-correction methods, which are predominantly based on learning from errors (An et al., 2023;Gou et al., 2023a), we propose a new multi-step reasoning paradigm known as Learning from Correctness (LECO). As illustrated in Figure 1, we begin by assigning a confidence score to each reasoning step in the first-round reasoning path. The step with the lowest confidence score will be identified as the earliest potential error step, and the steps before this point are considered to be \"correct\". Then, the correct steps, considered as \"correctness\", are appended to the input, and repeat the reasoning process. While the insight of learning from errors comes from the learning process of human students, the motivation behind our method is derived from progressive learning (Wu et al., 2019;Fayek et al., 2020), where correct reasoning steps are gradually accumulated to ultimately approach the correct answer. Furthermore, we also introduce an efficient method to measure the confidence for each reasoning step based on the generation logits, without the need for additional tokens or external tools. Specifically, we jointly consider the average confidence of each token within a step, the confidence divergence of a step, and the probability of step transmission to calculate the overall step confidence. We surprisingly find our method can identify almost 65% incorrect steps. We conduct experiments with both closed-source models (e.g.  and open-source models (e.g. DeepSeek; Shao et al. 2024) on various multistep reasoning tasks, including arithmetic reasoning, commonsense reasoning, and logical reasoning, show that our framework can significantly improve reasoning performance with less token consumption.\nOur primary contributions include 1) we propose a novel multi-step reasoning paradigm learning from correctness, dubbed as LECO, which progressively accumulates the correct steps and approaches the final answer; 2) we challenge the conventional belief that highquality feedback can only come from external sources and propose a unique intrinsic method to measure the confidence for each reasoning step, and 3) Both the off-the-shelf and opensource models can benefit from LECO on various multi-step reasoning tasks with reduced token consumption. More excitingly, LECO completely eliminates the need for prompt engineering.",
+            "publication_ref": [
+                "b38",
+                "b4",
+                "b54",
+                "b6",
+                "b44"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": "Learning from Feedback Improving LLMs through learning from feedback has become a prevalent strategy, notably through reinforcement learning from human feedback, which seeks to align LLMs with human values by refining their outputs based on feedback (Ouyang et al., 2022;Bai et al., 2022;Touvron et al., 2023). However, this method faces challenges such as high costs due to manual labor and a lack of real-time feedback capabilities (Pan et al., 2023;Fernandes et al., 2023). An alternative strategy involves using self-correcting LLMs, which rely on automated feedback to iteratively adapt and understand the consequences of their actions without heavy reliance on human intervention. This feedback can be derived from outside sources such as other models (Yang et al., 2022;Lightman et al., 2023;Xiong et al., 2023), tools (Huang et al., 2024;Lu et al., 2024b), knowledge bases (Gao et al., 2023;Yu et al., 2023), or evaluation metrics (Jung et al., 2022;Welleck et al., 2023).\nExternal feedback leverages external perspectives to identify errors and verify factual accuracy, offering insights that may not be recognized by the LLM alone. Conversely, feedback can also be internally generated, where the LLM evaluates and refines its output iteratively until a desired quality is achieved (Madaan et al., 2023;Shinn et al., 2023;Helbling et al., 2023;Xie et al., 2023). This self-improvement mechanism is particularly valuable in scenarios where external feedback is scarce or restricted (Yan et al., 2023;Lu et al., 2024a). However, Huang et al. (2023b) suggests that LLMs struggle to independently identify and correct errors through self-generated prompts. Recent effort (Gonen et al., 2023) show that an LLM's familiarity with a prompt's language predicts its effectiveness, with lower perplexity prompts leading to better performance. Unlike existing efforts, LECO focuses on learning from one's correct reasoning steps, without the need for feedback mechanisms including human intervention, external tools, or tailored prompts.",
+            "publication_ref": [
+                "b38",
+                "b18",
+                "b9",
+                "b21",
+                "b52",
+                "b0",
+                "b45",
+                "b55",
+                "b57",
+                "b11"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Reasoning without Prompting",
+            "text": "Recent studies have been focusing on improving the reasoning abilities of LLMs through various methodologies, primarily centered around the enhancement of prompting techniques. These works include few-shot prompting with intermediate steps augmented demonstrations (Wei et al., 2022;Fu et al., 2023;Yao et al., 2023;Wang et al., 2023) or zero-shot prompting with specific instructions (Kojima et al., 2022;Yasunaga et al., 2023). Although these methods have shown promising results, their effectiveness is often constrained by their task-specific nature and the labor-intensive process of designing prompts, leading to inconsistent outcomes across different tasks (Ye & Durrett, 2022;Zhou et al., 2023).\nAnother strategy to facilitate reasoning involves instruction tuning, which leverages a significant volume of chain-of-thought (CoT) data (Chung et al., 2022;Mukherjee et al., 2023;Gunasekar et al., 2023;Luo et al., 2023). Recently, Liu et al. (2024) proposed to tune LLMs by comparing the logit differences between a pair of tuned and untuned smaller models, showcasing improvements in reasoning without CoT distillation. In contrast to these methods, our LECO introduces an intrinsic self-correct reasoning mechanism that does not depend on fine-tuning or auxiliary models.\nAdditionally, there has been an interest in refining decoding algorithms specifically for reasoning. Notably, contrastive decoding (Li et al., 2023) has been developed to enhance a model's generation quality by adjusting the logits from smaller models, with recent research indicating its potential to boost reasoning performance (O 'Brien & Lewis, 2023). Wang & Zhou (2024) discovered that CoT reasoning patterns naturally occur within the decoding trajectories of LLMs, leading to the development of CoT-decoding, which aims to identify more reliable decoding paths. Such advancements present a promising avenue to augment the efficacy of LECO. Future work could explore the integration of these decoding algorithms to extend beyond the current use of greedy decoding.",
+            "publication_ref": [
+                "b51",
+                "b8",
+                "b8",
+                "b50",
+                "b23",
+                "b61",
+                "b63",
+                "b35",
+                "b29",
+                "b25",
+                "b49"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Methodology",
+            "text": "We introduce LECO, a learning from correctness framework, designed to enhance multi-step reasoning capabilities. Our core insight is that providing the model with more correct reasoning steps helps it narrow down the search space for the solution. This facilitates the process of reaching the final answer. To achieve this, LECO utilizes a prompt-free method to calculate the confidence score of each reasoning step. By identifying the most reliable steps, the model can then leverage these insights to guide its reasoning process.\n3 y t+1 = M (x t , Demo x ) ▷ Rethink Generation 10: end for 11: return y t Formally, we denote the entire reasoning path as S = (s 1 , s 2 , . . . , s n ), consisting of n indi- vidual steps. Each reasoning step s i = t i,1 , t i,2 , . . . , t i,|s i | is a sequence of tokens. We then apply the Softmax function on the logits score to obtain the probabilities p i,j for each token t i,j .\nAverage Token Score A straightforward approach to measure step confidence is by averaging the token probabilities within a given step. This average reflects the model's certainty in its reasoning during that step. Therefore, we define single-step confidence as:\navg score i = 1 |s i | |s i | ∑ j=1 p i,j(1)\nStep Divergence Score While average token probability seems intuitive, it can be misleading. Within a step, most tokens tend to be common words with high confidence scores but carry little information. Conversely, tokens crucial for reasoning, e.g. mathematical calculations, often have lower confidence. This paradox leads to a high average token confidence for the entire step, which contradicts our goal.\nTo address this issue, we propose the step divergence score. This metric measures the distribution uniformity of token probabilities within a step. Ideally, we want the token probabilities to be both high and evenly distributed across all tokens. To achieve this, we formulate the step divergence score based on the Kullback-Leibler Divergence (KLD; Kullback & Leibler 1951) between the normalized distribution P i = norm(p i,1 , p i,2 , ..., p i,|s i | ) of the token probabilities and the uniform distribution U:\ndiver score i = ln(KLD τ (P i , U) + 1), (2\n)\nwhere τ is the rescaling temperature for the KL divergence value, as the step divergence score is expected to vary between 0 and 1. In this work, τ is set to 0.3.",
+            "publication_ref": [
+                "b24"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Inter-step Transition Score",
+            "text": "Following the intra-step measurements, we sought to quantify the transition between consecutive steps. Our preliminary experiments yielded two key insights: 1) steps with lower overall confidence tend to have lower confidence levels specifically in the initial heading tokens (typically the first three), more dicussions can be found at Section D. 2) These initial heading tokens were also the most likely to change across different program runs. Based on these observations, we propose using the probabilities of the heading tokens in a step to represent the inter-step transition score between that step and the subsequent one. In other words, the transition score is determined by:\ntrans score i = 1 K K ∑ j=1 p i,j(3)\nwhere K is set to 3 here. Further analysis of hyperparameter settings is discussed in Section C.\nOverall, the confidence score s i score of step s i is denoted as,\ns i score = avg score i + trans score i -diver score i (4)",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "LECO: Learning From Correctness",
+            "text": "While leveraging step confidence scores, previous approaches (Gou et al., 2023a;Huang et al., 2023a) heavily rely on prompting LLMs to pinpoint and rectify erroneous steps. This dependence on prompts makes them rather sensitive. Our LECO framework tackles this issue by iteratively gathering correct steps and consequently refining the search space for potential reasoning steps. As depicted in Figure 1, LECO operates in a two-stage process.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Initial Stage",
+            "text": "Given an input x 0 and the corresponding demonstrations Demo x , the model M generates an initial answer y 0 :\ny 0 = M (x 0 , Demo x ) ,(5)\nwhere y 0 (s 0 , s 1 , ..., s |y 0 | ) consists of multiple reasoning steps.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Rethink Stage",
+            "text": "In this stage, we first calculate the confidence score for each step within the initial solution y 0 based on Eq. 4. We take the step with the lowest step confidence or the earlier one of the two steps with the lowest step confidence as the earliest error step, which depends on the complexity of the reasoning problems. Denote the selected error step as s e , 1 ≤ e ≤ |y 0 |1 , we name the steps before s e as \"correctness\" (s <e ). Then we iteratively append the correctness to the input and repeat the reasoning process with LLMs. At t-th iteration, the workflow can be formulated as, Table 2: Performance of GPT models on the MATH dataset.\nx t ← x t-1 + y t-1 (s < e), y t = M (x t , Demo x ) .(6)\nLECO alternates between input updating and rethink response generation until the stopping condition is met. The process either stops at a maximum iteration number T or identifies the two consecutive same answers. The algorithm can be found in Algorithm 1.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments",
+            "text": "Dataset and Baselines We evaluate the performance of LECO using a variety of datasets and baselines. The datasets are categorized into three reasoning types: arithmetic reasoning, commonsense reasoning, and logical reasoning. The arithmetic reasoning datasets include GSM8K (Cobbe et al., 2021), MATH (Hendrycks et al., 2021b), AQuA (Ling et al., 2017), and SVAMP (Patel et al., 2021). For commonsense reasoning, we use CSQA (Saha et al., 2018) and StrategyQA (Geva et al., 2021). The logical reasoning dataset is represented by Date Understanding (Srivastava et al., 2022).\nOur evaluation utilizes both off-the-shelf models, such as GPT-3.5-Turbo and GPT-4, and open-source models like DeepSeekMath-RL-7B (Shao et al., 2024). The open-source models are chosen for their superior performance on well-known mathematical datasets. We also   (Kim et al., 2023). SC polls the LLM multiple times and outputs the most frequent solution. ADPSC follows SC manner while conserving iterations via dynamically adjusting the number of samples per question using a lightweight stopping criterion. RCI is a representative work of learning from errors, which identifies errors and then self-corrects using designed prompts. In most runs, we use greedy decoding with a temperature of 0, except for the adaptive self-consistency and self-consistency settings, where a temperature of 0.7 is applied. The iteration number of self-consistency is set to 10. All experiments are run 10 times with different seeds, and the average scores are reported.",
+            "publication_ref": [
+                "b5",
+                "b28",
+                "b40",
+                "b43",
+                "b10",
+                "b44",
+                "b22"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Main Results",
+            "text": "As shown in Table 1, 2 and 3, LECO consistently improves the reasoning performance across the board. Particularly noteworthy is its outstanding performance in arithmetic reasoning, especially evident in the MATH dataset. The MATH dataset is renowned for its challenging nature, like more intricate problems and the need for more reasoning steps, with common CoT approaches demonstrating limited effectiveness on this benchmark. However, LECO effectively addresses this complexity by progressively collecting correct steps, thereby reducing reasoning perplexity and achieving substantial improvements. We also find that high-quality demonstrations are preferred when using LECO as larger improvements are consistently observed with LECO+Complex.\nFor commonsense reasoning tasks, LECO obtains slight improvements or comparable performance against baselines. Except for the StrategyQA dataset, some performance drops are spotted. We think this is because commonsense reasoning necessitates incorporating knowledge concerning events and their relationships. However, LECO primarily focuses on augmenting intrinsic reasoning ability through correctness, hence a moderate enhancement is deemed reasonable. This finding is also aligned with observations in Lyu et al. (2023).\nConversely, remarkable improvements are obtained in the date understanding dataset since this task is more similar to mathematical reasoning. It is worth noting that the difficulty of the task correlates positively with the impact of LECO, as evidenced by the substantial improvements achieved on the AQuA and MATH datasets. The primary reason for this is that the LLM tends to remain their initial reasoning path on the easy problems, offering fewer improvement rooms for LECO. For a comprehensive evaluation, we also apply LECO on the open-source model. We chose DeepSeekMath-RL-7B, as it demonstrates competitive performance in mathematical reasoning tasks. As shown in  Table 5: Fine-grained level ablation study of the three factors for calculating the step confidence. AVG denotes the average token confidence; DIV denotes the step divergence score; and TRANS denotes the inter-step transition score.\nand understand the errors and shortening the output length. Therefore, as shown in Section A.1, LECO reduces the token consumption by 80%/20% compared to SC/RCI.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Further Analyses",
+            "text": "Ablation Study We conduct ablation studies at two levels of granularity. At the coarsegrained level, we explore the effectiveness of the learning-from-correctness framework by replacing the selection of correct steps with random choices. Specifically, in the rethink stage, we randomly choose a reasoning step as the earliest error step and consider the preceding steps as the \"correctness\". From Table 4, we can see that the random selection of correct steps generally hurt the reasoning performance, suggesting the importance of identifying the true correctness.\nAt the fine-grained level, we deeply investigate the design of step confidence, which involves calculating the sum of the average token confidence, step divergence score, and inter-step transition score. To minimize the time and token consumption, we employ the accuracy of identifying the earliest error step as our metric. This measurement has proven to be crucial for enhancing reasoning performance in subsequent rounds, as evidenced by the results in Table 4. To this end, we randomly sampled 100 incorrect solutions on the GSM8K dataset and manually annotated the earliest error step for these solutions. Then, we divide the predicted step into three categories, including exact correct, partial correct and wrong, wherein exact correct means the predicted step is exactly the labeled earliest step; partial correct means the predicted step is an error step but located after the earliest step, and wrong means the predicted step is before the target location. As presented in Table 5, LECO performs best in finding the earliest error step, with accuracy over 50%. We also observe the significant performance drops when separately adopting one of these factors. More interestingly, among the three factors, we find the inter-step transition score affects the final performance most. This finding is also well-aligned with the observations in our preliminary experiments, as stated in Section 3.1, which suggests that the heading tokens of a step warrant more attention.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_5",
+                "tab_5"
+            ]
+        },
+        {
+            "heading": "Rethink Analysis",
+            "text": "As LECO and RCI are both the self-refinement framework, distinguished by their learning mechanisms from correctness or errors, we then compare them regarding the changes in answers after the rethinking stage. As illustrated in Figure 2, on the GSM8K dataset, over 85% of the time, both LECO and RCI retain the original answer. Among the remaining instances, LECO can modify more incorrect answers to correct ones than RCI (3.7% vs. 1.5%). On the StrategyQA dataset, the performance gap between LECO and RCI is more significant, where RCI revises 24.8% correct answers to incorrect. This phenomenon is in line with the recent findings (Huang et al., 2023b) that LLMs are currently incapable of self-correction based on their own feedback. Superior to RCI, LECO cleverly uses the accumulated correct information and avoids meticulous self-evaluation prompts to achieve better reasoning performance.  Table 7: Early Stop of LECO on the GSM8K and StrategyQA using GPT-3.5-Turbo and GPT-4.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_1"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Oracle Test",
+            "text": "We also conduct the oracle test to explore the upper bound of learning-fromcorrectness by directly providing the correct steps to LLMs during the rethink stage. To this end, we sampled 100 incorrect solutions generated by GPT-3.5-Turbo on the StrategyQA and GSM8K datasets, respectively. Subsequently, we manually annotate the earliest error step for these solutions. After collecting the preceding correct steps and appending them to the input, we generate an updated solution. As shown in Table 6, promising results are obtained that 36% and 22% wrong solutions can be amended with the help of correctness.\nIt is important to note that these figures do not represent the absolute upper limit of the potential to learn from correctness since the refinement process is iterative but we can only label the first round. More interestingly, LECO achieves a comparable performance (33 vs. 36; 21 vs. 22) with ORACLE and significantly outperforms the random choices, suggesting the effectiveness of LECO in identifying the true correctness.\nEarly Stop of LECO As discussed above, the majority of initial solutions would not be modified after the rethink stage, which additionally escalates token consumption and ratio of \"correct ⇒ incorrect\". To alleviate these problems, we present an early stop strategy of LECO, which dynamically determines whether the initial solution requires refinement based on the overall solution score.\nSimilar to the step confidence, we calculate the overall solution confidence score sln score by jointly considering the average score of step confidence and the inter-step divergence, formulated as, where s i score is the confidence score of i-th step, obtained by Equation 4. sln diver denotes the KL divergence between the normalized step scores S = norm(s 1 score, ..., s |sln| score) and an equal-length uniform discrete distribution, analogy to the Equation 2.\nsln score = 1 |sln| sln ∑ i=1 s i score -sln diver,(7)\nFirstly, we conducted the test on the GSM8K dataset using GPT-3.5-Turbo and recorded the solution confidence scores following Equation 7. As shown in Figure 3(a), we observed that the distributions of scores for both correct and incorrect solutions consistently tend to follow the norm distribution, with the average point of correct answers notably surpassing that of incorrect ones. We aim to employ this discrepancy to early stop the rethink stage. Specifically, we first randomly sample a subset from the testing data to obtain the distribution of solution scores, approximately 1/6 of the data of the entire test set used. Figure 3(b) illustrates the distribution on the GSM8K sample set, which also follows the norm distribution. Then, based on the 3-σ characteristics of the norm distribution, we adopt the positive 1-σ value from the score distribution of the incorrect solutions (µ + σ) as our threshold, which covers 84% incorrect samples while only including around 50% correct instances.\nAs demonstrated in Table 7, consistent improvements can be obtained with early-stop LECO over the vanilla CoT-based method. Compared to the standard LECO, there are slight performance drops since more incorrect instances are filtered and not modified. However, early-stop LECO can still maintain the performance levels intermediate to those of SC and LECO while using fewer iteration rounds and tokens, approximately further reducing 10% tokens against the standard LECO (More details in Appendix B). We note that early-stop LECO is an alternative choice for the users to achieve a better trade-off between token consumption and performance.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2",
+                "fig_2"
+            ],
+            "table_ref": [
+                "tab_6"
+            ]
+        },
+        {
+            "heading": "Conclusion and Future Work",
+            "text": "This work introduces LECO, an intrinsic self-correct reasoning framework designed to enhance LLM reasoning performance without relying on human feedback, external tools, or handcrafted prompts. LECO leverages a multi-step reasoning paradigm, prioritizing learning from successful reasoning steps. It incorporates a novel method for measuring confidence in each step based on generation logits. Our experiments across diverse multistep reasoning tasks demonstrate LECO's effectiveness in improving reasoning accuracy while minimizing token consumption. This approach represents a distinct pathway for augmenting LLM capabilities, offering a promising avenue for advancing their aptitude in reasoning tasks. For future work, a worthy noting point is that LECO, especially its step confidence algorithm, would stand as an excellent candidate for pruning the complex reasoning structures, such as Tree-of-Thoughts (Yao et al., 2023) and Graph-of-Thoughts (Besta et al., 2023).  As presented in Algorithm 20, firstly, we sample the entire dataset according to a certain proportion, obtaining distributions of correct and incorrect solutions. Leveraging the normal distribution traits of incorrect responses, we utilize the positive 1-σ value as the threshold.\nFor the remaining data, if its solution score surpasses the threshold, we accept this answer outright; otherwise, we resort to the standard LECO method for reconsideration.   ",
+            "publication_ref": [
+                "b8"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.2 Token Consumption and Iteration Number of Early Stop LECO",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "C Hyperparameter Settings",
+            "text": "We compared the experimental results under different settings and found that our method is relatively insensitive to hyperparameters, such as K and τ. We attach the experimental results of GPT-3.5 on GSM8K as follows.\nTable 16 and Table 17 present the settings of hyperparameter K and τ. In the design of the transition score, the parameter K determines the usage of several initial tokens, hence the value of K can not be very large and we set K varying from 1 to 5.\nIn the design of the divergence score, the parameter τ is used to rescale the KL divergence to a reasonable range and helps the divergence score to show significant performance. When τ exceeds 0.5 in the logarithmic function, the divergence diminishes to negligible values, such as 0.002 or 0.004, which fail to capture the desired differences. Consequently, our study focuses on the impact of τ within the range of 0.1 to 0.5.\nThe results, as depicted in the tables, reveal a consistent improvement, indicating the robustness of our method to these parameter.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_14",
+                "tab_15"
+            ]
+        },
+        {
+            "heading": "D Preliminary Experiments",
+            "text": "We draw the scatter plot of the relationship between the overall confidence score and interstep transition score for 1000 reasoning steps. As shown in Fig4, it's obvious that the overall confidence and inter-step transition scores are highly positively correlated.  On Friday the store sold 14 pairs of tennis shoes.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "E Case Study of LECO",
+            "text": "The next day they sold double that number of shoes.\nOn the last day of the sale they sold one-half the amount that they did the day before, but six people returned their pairs because they didn't fit.\nHow many tennis shoes were sold by the end of the sale? Gold Answer 50.0",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "CoT",
+            "text": "Let's think step by step\nStep 1: On Friday, the store sold 14 pairs of tennis shoes.\nStep 2: The next day, they sold double that number, which is 14 x 2 = 28 pairs of tennis shoes.\nStep 3: On the last day, they sold one-half the amount of the day before, which is 28 / 2 = 14 pairs of tennis shoes.\nStep 4: But 6 pairs were returned, so the total number of tennis shoes sold is 14 + 14 -6 = 22 pairs.\nStep 5: The answer is \\boxed{22}.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Complex",
+            "text": "Let's think step by step\nStep 1: On Friday, the store sold 14 pairs of tennis shoes.\nStep 2: The next day, they sold double that number, so they sold 14 x 2 = 28 pairs of tennis shoes.\nStep 3: On the last day, they sold one-half the amount they did the day before, so they sold 28 / 2 = 14 pairs of tennis shoes.\nStep 4: However, six people returned their pairs, so the total number of pairs sold is 14 + 14 -6 = 22 pairs of tennis shoes.\nStep 5: Since each pair of tennis shoes represents one unit, the store sold 22 tennis shoes by the end of the sale.\nStep 6: The answer is \\boxed{22}.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "RCI",
+            "text": "The previous answer is incorrect because it only calculates the number of pairs of tennis shoes sold, not the total number of tennis shoes.\nTo find the total number of tennis shoes, we need to multiply the number of pairs by 2.\nLet's correct the answer:\nStep 1: On Friday, the store sold 14 pairs of tennis shoes.\nStep 2: The next day, they sold double that number, so they sold 14 x 2 = 28 pairs of tennis shoes.\nStep 3: On the last day, they sold one-half the amount they did the day before, so they sold 28 / 2 = 14 pairs of tennis shoes.\nStep 4: However, six people returned their pairs, so the total number of pairs sold is 14 + 14 -6 = 22 pairs of tennis shoes.\nStep 5: Since each pair of tennis shoes represents two units (one for the left foot and one for the right foot), the store sold 22 x 2 = 44 tennis shoes by the end of the sale.\nThe answer is \\boxed{44}.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ADPSC",
+            "text": "Let's think step by step\nStep 1: On Friday, the store sold 14 pairs of tennis shoes.\nStep 2: On the next day, they sold double that number, so they sold 14 * 2 = 28 pairs of tennis shoes.\nStep 3: On the last day, they sold half the amount they did the day before, so they sold 28 / 2 = 14 pairs of tennis shoes.\nStep 4: However, six people returned their pairs, so the total number of pairs sold is 14 + 14 -6 = 22 pairs of tennis shoes.\nStep 5: Since each pair consists of two shoes, the total number of tennis shoes sold is 22 * 2 = 44 tennis shoes.\nStep 6: The answer is 44.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "SC",
+            "text": "Let's think step by step\nStep 1: On Friday, the store sold 14 pairs of tennis shoes.\nStep 2: The next day, they sold double that number, so they sold 14 x 2 = 28 pairs of tennis shoes.\nStep 3: On the last day, they sold one-half the amount as the day before, so they sold 28 / 2 = 14 pairs of tennis shoes.\nStep 4: However, 6 people returned their pairs, so the total number of pairs sold is 14 + 14 -6 = 22 pairs of tennis shoes.\nStep 5: Since each pair of tennis shoes consists of 2 shoes, the total number of tennis shoes sold is 22 x 2 = 44 tennis shoes.\nStep 6: The answer is 44.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "COT+LeCo",
+            "text": "Let's think step by step\nStep 1: On Friday, the store sold 14 pairs of tennis shoes.\nStep 2: On Saturday, they sold double that number, so 14 x 2 = 28 pairs of tennis shoes.\nStep 3: On the last day, they sold one-half the amount of the day before, so 28 / 2 = 14 pairs of tennis shoes.\nStep 4: But 6 pairs were returned, so 14 -6 = 8 pairs of tennis shoes were sold on the last day.\nStep 5: In total, they sold 14 + 28 + 8 = 50 pairs of tennis shoes.\nStep 6: The answer is \\boxed{50}.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Complex+LeCo",
+            "text": "Let's think step by step\nStep 1: On Friday, the store sold 14 pairs of tennis shoes.\nStep 2: The next day, they sold double that number, so they sold 14 x 2 = 28 pairs of tennis shoes.\nSte p3: On the last day, they sold one-half the amount they did the day before, so they sold 28 / 2 = 14 pairs of tennis shoes.\nStep 4: However, six people returned their pairs, so the total number of tennis shoes sold is 14 + 28 + 14 -6 = 50 pairs of tennis shoes.\nStep 5: The answer is \\boxed{50} pairs of tennis shoes. Step 1: JPMorgan Chase is a bank.\nStep 2: Banks have a lot of money.\nStep 3: There are approximately 330 million Americans.\nStep 4: 10multipliedby330millionis3.3 billion.\nStep 5: JPMorgan Chase is a very large bank, but it may not have enough money to give $10 to every American.\nStep 6: Thus, JPMorgan Chase may not be able to give every American $10.\nStep 7: So the answer is \\boxed{no}.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Complex",
+            "text": "Let's think step by step.\nStep 1: JPMorgan Chase is a multinational investment bank and financial services company.\nStep 2: JPMorgan Chase has a market capitalization of over $400 billion.\nStep 3: The population of the United States is over 330 million.\nStep 4: To give every American $10, JPMorgan Chase would need to distribute over $3.3 billion.\nStep 5: JPMorgan Chase's market capitalization is significantly smaller than the amount needed to give every American $10.\nStep 6: Thus, JPMorgan Chase could not give every American $10.\nStep 7: So the answer is \\boxed{no} RCI I apologize for the mistake in my previous answer.\nUpon reviewing the information, it is clear that JPMorgan Chase would not be able to give every American $10.\nThe amount required to $10 to each of the approximately 331 million Americans would be $3.31 billion, which is a significant amount even for a large financial institution like JPMorgan Chase.\nTherefore, the correct answer is \\boxed{no}.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ADPSC",
+            "text": "Let's think step by step.\nStep 1: JPMorgan Chase is a multinational investment bank and financial services company.\nStep 2: The current population of the United States is approximately 331 million people.\nStep 3: If JPMorgan Chase were to give every American $10, they would need to distribute a total of $3.31 billion.\nStep 4: JPMorgan Chase's total assets as of 2020 were $3.42 trillion.\nStep 5: $3.31 billion is a very small fraction of JPMorgan Chase's total assets.\nStep 6: Thus, JPMorgan Chase could give every American $10.\nStep 7: So the answer is \\boxed{yes}.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "SC",
+            "text": "Let's think step by step.\nStep 1: JPMorgan Chase is a multinational investment bank and financial services company.\nStep 2: The current population of the United States is approximately 331 million people.\nStep 3: If JPMorgan Chase were to give every American $10, they would need to distribute a total of $3.31 billion.\nStep 4: JPMorgan Chase's total assets as of 2020 were $3.42 trillion.\nStep 5: $3.31 billion is a very small fraction of JPMorgan Chase's total assets.\nStep 6: Thus, JPMorgan Chase could give every American $10.\nStep 7: So the answer is \\boxed{yes}",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "COT+LeCo",
+            "text": "Let's think step by step\nStep 1: JPMorgan Chase is a bank.\nStep 2: Banks have a lot of money.\nStep 3: Thus, JPMorgan Chase could potentially give every American $10.\nStep 4: So the answer is \\boxed{yes}",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Complex+LeCo",
+            "text": "Let's think step by step\nStep 1: JPMorgan Chase is a multinational investment bank and financial services company.\nStep 2: JPMorgan Chase is one of the largest banks in the United States.\nStep 3: The population of the United States is over 300 million people.\nStep 4: To give every American $10, JPMorgan Chase would need to distribute over $3 billion.\nStep 5: JPMorgan Chase's total assets are over $3 trillion.\nStep 6: Thus, JPMorgan Chase could give every American $10.\nStep 7: So the answer is \\boxed{yes} Table 19: Case Study of LECO on StrategyQA by GPT-3.5-Turbo Question Five balls are numbered with the integers 1 through 5 and placed in a jar.\nThree are drawn without replacement.\nWhat is the probability that the sum of the three integers on the balls is odd?\nExpress your answer as a common fraction.\nGold Answer 2 5",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_7"
+            ]
+        },
+        {
+            "heading": "Complex",
+            "text": "Let's think step by step\nStep 1: There are two cases to consider: either all three integers are odd, or exactly two of the integers are odd.\nStep 2: Case 1: If all three integers are odd, there are ( 3 3 ) = 1 ways to choose the odd integers.\nStep 3: There are ( 53 ) = 10 total ways to choose three integers from the five.\nStep 4: Case 2: If exactly two of the integers are odd, there are ( 3 2 ) = 3 ways to choose the odd integers and ( 2 1 ) = 2 ways to choose the even integer.\nStep 5: There are ( 53 ) = 10 total ways to choose three integers from the five.\nStep 6: So, the probability that the sum of the three integers is odd is 1+3•2 10 = 1+6 10 = boxed{ 7 10 }.\nStep 7: The answer is \\boxed{ 7 10 }.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "RCI A: Let's think step by step",
+            "text": "Step 1: There are a total of ( 53 ) = 10 ways to choose 3 balls out of 5.\nStep 2: We need to count the number of ways to choose 3 balls such that the sum of their integers is odd.\nStep 3: The sum of three integers will be odd if and only if there are an odd number of odd integers among the three chosen balls.\nStep 4: There are ( 3 1 ) = 3 ways to choose 1 odd integer and 2 even integers.\nStep 5: There are ( 23 ) = 0 ways to choose 3 odd integers.\nStep 6: There are ( 3 2 ) = 3 ways to choose 2 odd integers and 1 even integer.\nStep 7: So, the total number of ways to choose 3 balls such that the sum of their integers is odd is 3 + 0 + 3 = 6.\nStep 8: Therefore, the probability is 6 10 = boxed{ 3 5 }.\nStep 9: The answer is \\boxed{ 3 5 }.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "ADPSC Let's think step by step",
+            "text": "Step 1: There are two cases to consider: either all three integers are odd, or two are odd and one is even.\nStep 2: Case 1: If all three integers are odd, there are ( 3 3 ) = 1 ways to choose the odd integers.\nStep 3: There are 5 odd integers to choose from, so the probability in this case is 1\n( 5 3 ) = 1 10 .\nStep 4: Case 2: If two integers are odd and one is even, there are ( 3 2 ) • ( 2 1 ) = 3 • 2 = 6 ways to choose the integers.\nStep 5: There are 3 odd integers and 2 even integers to choose from, so the probability in this case is 6\n( 5 3 )\n= 6 10 = 3 5 .\nStep 6: The total probability is 1 10 + 3 5 = 1 10 + 6 10 = 7 10 .\nStep 7: The answer is \\boxed{ 7 10 }",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "SC Let's think step by step",
+            "text": "Step 1: There are two cases to consider: either all three integers are odd, or two are odd and one is even.\nStep 2: Case 1: If all three integers are odd, there are ( 3 3 ) = 1 ways to choose the odd integers.\nStep 3: There are 5 odd integers to choose from, so the probability in this case is 1\n( 5 3 ) = 1 10 .\nStep 4: Case 2: If two integers are odd and one is even, there are ( 3 2 ) • ( 2 1 ) = 3 • 2 = 6 ways to choose the integers.\nStep 5: There are 3 odd integers and 2 even integers to choose from, so the probability in this case is 6\n( 5 3 )\n= 6 10 = 3 5 .\nStep 6: The total probability is 1 10 + 3 5 = 1 10 + 6 10 = 7 10 .\nStep 7: The answer is \\boxed{ 7 10 }",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Complex+LeCo Let's think step by step",
+            "text": "Step 1: There are two cases to consider: the sum is odd if either all three numbers are odd or two numbers are odd and one number is even.\nStep 2: Case 1: All three numbers are odd. There are 3 odd numbers (1, 3, 5) and 2 even numbers (2, 4) to choose from.\nStep 3: The probability of choosing 3 odd numbers is 3 5 • 2 4 • 1 3 = 1 10 .\nStep 4: Case 2: Two numbers are odd and one number is even. There are 3 odd numbers and 2 even numbers to choose from.\nStep 5: The probability of choosing 2 odd numbers and 1 even number is 3 5\n• 2 4 • 2 3 + 3 5 • 2 4 • 2 3 + 3 5 • 2 4 • 2 3 = 3 10 .\nStep 6: The total probability is 1 10 + 3 10 = boxed{ 2 5 }.\nStep 7: The answer is \\boxed{ 2 5 }.\nTable 20: Case Study of LECO on the MATH dataset using GPT-3.5-Turbo.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Acknowledgments",
+            "text": "This work was supported in part by the Research Grants Council of the Hong Kong SAR under Grant GRF 11217823 and Collaborative Research Fund C1042-23GF, the National Natural Science Foundation of China under Grant 62371411, InnoHK initiative, the Government of the HKSAR, Laboratory for AI-Powered Financial Technologies.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Appendix",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Efficiency of Different Models",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Let's sample step by step: Adaptive-consistency for efficient reasoning and coding with llms",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Aman Madaan; Pranjal Aggarwal; Yiming Yang; Mausam "
+        },
+        {
+            "ref_id": "b1",
+            "title": "Learning from mistakes makes LLM better reasoner",
+            "journal": "",
+            "year": "",
+            "authors": "Zexiong Shengnan An; Zeqi Ma; Nanning Lin; Jian-Guang Zheng; Weizhu Lou;  Chen"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Constitutional AI: harmlessness from AI feedback",
+            "journal": "",
+            "year": "",
+            "authors": "Yuntao Bai; Saurav Kadavath; Sandipan Kundu; Amanda Askell; Jackson Kernion; Andy Jones; Anna Chen; Anna Goldie; Azalia Mirhoseini; Cameron Mckinnon; Carol Chen; Catherine Olsson; Christopher Olah; Danny Hernandez; Dawn Drain; Deep Ganguli; Dustin Li; Eli Tran-Johnson; Ethan Perez; Jamie Kerr; Jared Mueller; Jeffrey Ladish; Joshua Landau; Kamile Kamal Ndousse; Liane Lukosiute; Michael Lovitt; Nelson Sellitto; Nicholas Elhage; Noemí Schiefer; Nova Mercado; Robert Dassarma; Robin Lasenby; Sam Larson; Scott Ringer; Shauna Johnston; Sheer El Kravec; Stanislav Showk; Tamera Fort; Timothy Lanham; Tom Telleen-Lawton; Tom Conerly; Tristan Henighan; Samuel R Hume; Zac Bowman; Ben Hatfield-Dodds; Dario Mann; Nicholas Amodei; Sam Joseph; Tom Mccandlish; Jared Brown;  Kaplan"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Graph of thoughts: Solving elaborate problems with large language models",
+            "journal": "",
+            "year": "",
+            "authors": "Maciej Besta; Nils Blach; Ales Kubicek; Robert Gerstenberger; Lukas Gianinazzi; Joanna Gajda; Tomasz Lehmann; Michal Podstawski; Hubert Niewiadomski; Piotr Nyczyk; Torsten Hoefler"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Scaling instruction-finetuned language models",
+            "journal": "",
+            "year": "2005",
+            "authors": "B Tom; Benjamin Brown; Nick Mann; Melanie Ryder; Jared Subbiah; Prafulla Kaplan; Arvind Dhariwal; Pranav Neelakantan; Girish Shyam; Amanda Sastry; Sandhini Askell; Ariel Agarwal; Gretchen Herbert-Voss; Tom Krueger; Rewon Henighan; Aditya Child; Daniel M Ramesh; Jeffrey Ziegler; Clemens Wu; Christopher Winter; Mark Hesse; Eric Chen; Mateusz Sigler; Scott Litwin; Benjamin Gray; Jack Chess; Christopher Clark; Sam Berner; Alec Mccandlish; Ilya Radford; Dario Sutskever;  Amodei ; Le; Shayne Hou; Barret Longpre; Yi Zoph; William Tay; Eric Fedus; Xuezhi Li; Mostafa Wang; Siddhartha Dehghani; Albert Brahma;  Webson; Shane Shixiang; Zhuyun Gu; Mirac Dai; Xinyun Suzgun; Aakanksha Chen; Sharan Chowdhery; Gaurav Narang; Adams Mishra; Vincent Y Yu; Yanping Zhao; Andrew M Huang; Hongkun Dai; Slav Yu; Ed H Petrov; Jeff Chi; Jacob Dean; Adam Devlin; Denny Roberts; Quoc V Zhou; Jason Le;  Wei"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Training verifiers to solve math word problems",
+            "journal": "",
+            "year": "2021",
+            "authors": "Karl Cobbe; Vineet Kosaraju; Mohammad Bavarian; Mark Chen; Heewoo Jun; Lukasz Kaiser; Matthias Plappert; Jerry Tworek; Jacob Hilton; Reiichiro Nakano; Christopher Hesse; John Schulman"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Progressive learning: A deep learning framework for continual learning",
+            "journal": "Neural Networks",
+            "year": "2020",
+            "authors": "M Haytham; Lawrence Fayek; Hong Ren Cavedon;  Wu"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Bridging the gap: A survey on integrating (human) feedback for natural language generation",
+            "journal": "",
+            "year": "",
+            "authors": "Patrick Fernandes; Aman Madaan; Emmy Liu; Ant Ónio Farinhas; Pedro Henrique Martins; Amanda Bertsch; G C José; Shuyan De Souza; Tongshuang Zhou; Graham Wu;  Neubig; F T André;  Martins"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Complexity-based prompting for multi-step reasoning",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yao Fu; Hao Peng; Ashish Sabharwal; Peter Clark; Tushar Khot"
+        },
+        {
+            "ref_id": "b9",
+            "title": "RARR: researching and revising what language models say, using language models",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Luyu Gao; Zhuyun Dai; Panupong Pasupat; Anthony Chen; Arun Tejasvi Chaganty; Yicheng Fan; Y Vincent; Ni Zhao; Hongrae Lao; Da-Cheng Lee; Kelvin Juan;  Guu"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Did aristotle use a laptop? A question answering benchmark with implicit reasoning strategies",
+            "journal": "Trans. Assoc. Comput. Linguistics",
+            "year": "2021",
+            "authors": "Mor Geva; Daniel Khashabi; Elad Segal; Tushar Khot; Dan Roth; Jonathan Berant"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Demystifying prompts in language models via perplexity estimation",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Srini Hila Gonen; Terra Iyer; Noah A Blevins; Luke Smith;  Zettlemoyer"
+        },
+        {
+            "ref_id": "b12",
+            "title": "CRITIC: large language models can self-correct with tool-interactive critiquing",
+            "journal": "",
+            "year": "2023",
+            "authors": "Zhibin Gou; Zhihong Shao; Yeyun Gong; Yelong Shen; Yujiu Yang; Nan Duan; Weizhu Chen"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Tora: A tool-integrated reasoning agent for mathematical problem solving",
+            "journal": "",
+            "year": "2023",
+            "authors": "Zhibin Gou; Zhihong Shao; Yeyun Gong; Yelong Shen; Yujiu Yang; Minlie Huang; Nan Duan; Weizhu Chen"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Textbooks are all you need",
+            "journal": "",
+            "year": "",
+            "authors": "Suriya Gunasekar; Yi Zhang; Jyoti Aneja; Caio César; Teodoro Mendes; Allie Del Giorno; Sivakanth Gopi; Mojan Javaheripi; Piero Kauffmann; Gustavo De Rosa; Olli Saarikivi; Adil Salim; Shital Shah; Harkirat Singh Behl; Xin Wang; Sébastien Bubeck; Ronen Eldan; Adam Tauman Kalai; Yin Tat Lee; Yuanzhi Li"
+        },
+        {
+            "ref_id": "b15",
+            "title": "LLM self defense: By self examination, llms know they are being tricked",
+            "journal": "",
+            "year": "",
+            "authors": "Alec Helbling; Mansi Phute; Matthew Hull; Duen Horng; Chau "
+        },
+        {
+            "ref_id": "b16",
+            "title": "Measuring massive multitask language understanding",
+            "journal": "",
+            "year": "2021",
+            "authors": "Dan Hendrycks; Collin Burns; Steven Basart; Andy Zou; Mantas Mazeika; Dawn Song; Jacob Steinhardt"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Measuring mathematical problem solving with the MATH dataset",
+            "journal": "",
+            "year": "2021-12",
+            "authors": "Dan Hendrycks; Collin Burns; Saurav Kadavath; Akul Arora; Steven Basart; Eric Tang; Dawn Song; Jacob Steinhardt"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Soap: Enhancing efficiency of generated code via selfoptimization",
+            "journal": "",
+            "year": "2024",
+            "authors": "Dong Huang; Jianbo Dai; Han Weng; Puzhen Wu; Yuhao Qing; Jie M Zhang; Heming Cui; Zhijiang Guo"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Large language models can self-improve",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Jiaxin Huang; Shixiang Gu; Le Hou; Yuexin Wu; Xuezhi Wang; Hongkun Yu; Jiawei Han"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Large language models cannot self-correct reasoning yet",
+            "journal": "",
+            "year": "2023",
+            "authors": "Jie Huang; Xinyun Chen; Swaroop Mishra; Steven Huaixiu; Adams Wei Zheng; Xinying Yu; Denny Song;  Zhou"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Maieutic prompting: Logically consistent reasoning with recursive explanations",
+            "journal": "Association for Computational Linguistics",
+            "year": "2022",
+            "authors": "Jaehun Jung; Lianhui Qin; Sean Welleck; Faeze Brahman; Chandra Bhagavatula; Ronan Le Bras; Yejin Choi"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Language models can solve computer tasks",
+            "journal": "",
+            "year": "2023",
+            "authors": "Geunwoo Kim; Pierre Baldi; Stephen Mcaleer"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Large language models are zero-shot reasoners",
+            "journal": "",
+            "year": "2022-12-09",
+            "authors": "Takeshi Kojima; Shane Shixiang; Machel Gu; Yutaka Reid; Yusuke Matsuo;  Iwasawa"
+        },
+        {
+            "ref_id": "b24",
+            "title": "On information and sufficiency. The annals of mathematical statistics",
+            "journal": "",
+            "year": "1951",
+            "authors": "Solomon Kullback; Richard A Leibler"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Contrastive decoding: Open-ended text generation as optimization",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Lisa Xiang; Ari Li; Daniel Holtzman; Percy Fried; Jason Liang; Tatsunori Eisner; Luke Hashimoto; Mike Zettlemoyer;  Lewis"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Let's verify step by step",
+            "journal": "",
+            "year": "",
+            "authors": "Vineet Hunter Lightman; Yura Kosaraju; Harrison Burda; Bowen Edwards; Teddy Baker; Jan Lee; John Leike; Ilya Schulman; Karl Sutskever;  Cobbe"
+        },
+        {
+            "ref_id": "b27",
+            "title": "",
+            "journal": "",
+            "year": "2023",
+            "authors": " Corr"
+        },
+        {
+            "ref_id": "b28",
+            "title": "Program induction by rationale generation: Learning to solve and explain algebraic word problems",
+            "journal": "Association for Computational Linguistics",
+            "year": "2017-08-04",
+            "authors": "Wang Ling; Dani Yogatama; Chris Dyer; Phil Blunsom"
+        },
+        {
+            "ref_id": "b29",
+            "title": "Tuning language models by proxy",
+            "journal": "",
+            "year": "2024",
+            "authors": "Alisa Liu; Xiaochuang Han; Yizhong Wang; Yulia Tsvetkov; Yejin Choi; Noah A Smith"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Autocv: Empowering reasoning with automated process labeling via confidence variation",
+            "journal": "",
+            "year": "2024",
+            "authors": "Jianqiao Lu; Zhiyang Dou; Hongru Wang; Zeyu Cao; Jianbo Dai; Yingjia Wan; Yinya Huang; Zhijiang Guo"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Process-driven autoformalization in lean 4",
+            "journal": "",
+            "year": "2024",
+            "authors": "Jianqiao Lu; Zhengying Liu; Yingjia Wan; Yinya Huang; Haiming Wang; Yang Zhicheng; Jing Tang; Zhijiang Guo"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Wizardmath: Empowering mathematical reasoning for large language models via reinforced evol-instruct",
+            "journal": "",
+            "year": "",
+            "authors": "Haipeng Luo; Qingfeng Sun; Can Xu; Pu Zhao; Jianguang Lou; Chongyang Tao; Xiubo Geng; Qingwei Lin; Shifeng Chen; Dongmei Zhang"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Faithful chain-of-thought reasoning",
+            "journal": "",
+            "year": "",
+            "authors": "Qing Lyu; Shreya Havaldar; Adam Stein; Li Zhang; Delip Rao; Eric Wong; Marianna Apidianaki; Chris Callison-Burch"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Self-refine: Iterative refinement with self-feedback",
+            "journal": "",
+            "year": "",
+            "authors": "Aman Madaan; Niket Tandon; Prakhar Gupta; Skyler Hallinan; Luyu Gao; Sarah Wiegreffe; Uri Alon; Nouha Dziri; Shrimai Prabhumoye; Yiming Yang; Sean Welleck; Prasad Bodhisattwa; Shashank Majumder; Amir Gupta; Peter Yazdanbakhsh;  Clark"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Orca: Progressive learning from complex explanation traces of GPT-4",
+            "journal": "",
+            "year": "2023",
+            "authors": "Subhabrata Mukherjee; Arindam Mitra; Ganesh Jawahar; Sahaj Agarwal; Hamid Palangi; Ahmed Awadallah"
+        },
+        {
+            "ref_id": "b36",
+            "title": "Contrastive decoding improves reasoning in large language models",
+            "journal": "",
+            "year": "",
+            "authors": "Sean O' Brien; Mike Lewis"
+        },
+        {
+            "ref_id": "b37",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b38",
+            "title": "Training language models to follow instructions with human feedback",
+            "journal": "",
+            "year": "2022-12-09",
+            "authors": "Long Ouyang; Jeffrey Wu; Xu Jiang; Diogo Almeida; Carroll L Wainwright; Pamela Mishkin; Chong Zhang; Sandhini Agarwal; Katarina Slama; Alex Ray; John Schulman; Jacob Hilton; Fraser Kelton; Luke Miller; Maddie Simens; Amanda Askell; Peter Welinder; Paul F Christiano; Jan Leike; Ryan Lowe"
+        },
+        {
+            "ref_id": "b39",
+            "title": "Automatically correcting large language models: Surveying the landscape of diverse self-correction strategies",
+            "journal": "",
+            "year": "",
+            "authors": "Liangming Pan; Michael Saxon; Wenda Xu; Deepak Nathani; Xinyi Wang; William Yang; Wang "
+        },
+        {
+            "ref_id": "b40",
+            "title": "Are NLP models really able to solve simple math word problems?",
+            "journal": "Association for Computational Linguistics",
+            "year": "2021",
+            "authors": "Arkil Patel; Satwik Bhattamishra; Navin Goyal; Anna Rumshisky; Luke Zettlemoyer; Dilek Hakkani-T Ür; Iz Beltagy; Steven Bethard"
+        },
+        {
+            "ref_id": "b41",
+            "title": "Instruction tuning with GPT-4",
+            "journal": "",
+            "year": "",
+            "authors": "Baolin Peng; Chunyuan Li; Pengcheng He; Michel Galley; Jianfeng Gao"
+        },
+        {
+            "ref_id": "b42",
+            "title": "A survey of hallucination in large foundation models",
+            "journal": "CoRR",
+            "year": "",
+            "authors": " Vipula Rawte; P Amit; Amitava Sheth;  Das"
+        },
+        {
+            "ref_id": "b43",
+            "title": "Complex sequential question answering: Towards learning to converse over linked question answer pairs with a knowledge graph",
+            "journal": "AAAI Press",
+            "year": "2018",
+            "authors": "Amrita Saha; Vardaan Pahuja; M Mitesh; Karthik Khapra; Sarath Sankaranarayanan;  Chandar"
+        },
+        {
+            "ref_id": "b44",
+            "title": "Deepseekmath: Pushing the limits of mathematical reasoning in open language models",
+            "journal": "",
+            "year": "2024",
+            "authors": "Zhihong Shao; Peiyi Wang; Qihao Zhu; Runxin Xu; Junxiao Song; Mingchuan Zhang; Y K Li; Y Wu; Daya Guo"
+        },
+        {
+            "ref_id": "b45",
+            "title": "Reflexion: language agents with verbal reinforcement learning",
+            "journal": "",
+            "year": "2023",
+            "authors": "Noah Shinn; Federico Cassano; Ashwin Gopinath; Karthik Narasimhan; Shunyu Yao"
+        },
+        {
+            "ref_id": "b46",
+            "title": "Beyond the imitation game: Quantifying and extrapolating the capabilities of language models",
+            "journal": "",
+            "year": "",
+            "authors": "Aarohi Srivastava; Abhinav Rastogi; Abhishek Rao; Abu Awal; Md Shoeb; Abubakar Abid; Adam Fisch; Adam R Brown; Adam Santoro; Aditya Gupta; Adrià Garriga-Alonso; Agnieszka Kluska; Aitor Lewkowycz; Akshat Agarwal; Alethea Power; Alex Ray; Alex Warstadt; Alexander W Kocurek; Ali Safaya; Ali Tazarv; Alice Xiang; Alicia Parrish; Allen Nie; Aman Hussain; Amanda Askell; Amanda Dsouza; Ameet Rahane; Anantharaman S Iyer; Anders Andreassen; Andrea Santilli; Andreas Stuhlm Üller; Andrew M Dai; Andrew La; Andrew K Lampinen; Andy Zou; Angela Jiang; Angelica Chen; Anh Vuong; Animesh Gupta; Anna Gottardi; Antonio Norelli; Anu Venkatesh; Arash Gholamidavoodi; ; "
+        },
+        {
+            "ref_id": "b47",
+            "title": "Large language models in medicine",
+            "journal": "Nature medicine",
+            "year": "2023",
+            "authors": "Arun James Thirunavukarasu; Darren Shu; Jeng Ting; Kabilan Elangovan; Laura Gutierrez; Ting Fang Tan; Daniel Shu; Wei Ting"
+        },
+        {
+            "ref_id": "b48",
+            "title": "Llama 2: Open foundation and fine-tuned chat models",
+            "journal": "",
+            "year": "",
+            "authors": "Hugo Touvron; Louis Martin; Kevin Stone; Peter Albert; Amjad Almahairi; Yasmine Babaei; Nikolay Bashlykov; Soumya Batra; Prajjwal Bhargava; Shruti Bhosale; Dan Bikel; Lukas Blecher; Cristian Canton-Ferrer; Moya Chen; Guillem Cucurull; David Esiobu; Jude Fernandes; Jeremy Fu; Wenyin Fu; Brian Fuller; Cynthia Gao; Vedanuj Goswami; Naman Goyal; Anthony Hartshorn; Saghar Hosseini; Rui Hou; Hakan Inan; Marcin Kardas; Viktor Kerkez; Madian Khabsa; Isabel Kloumann; Artem Korenev; Punit Singh Koura; Marie-Anne Lachaux; Thibaut Lavril; Jenya Lee; Diana Liskovich; Yinghai Lu; Yuning Mao; Xavier Martinet; Todor Mihaylov; Pushkar Mishra; Igor Molybog; Yixin Nie; Andrew Poulton; Jeremy Reizenstein; Rashi Rungta; Kalyan Saladi; Alan Schelten; Ruan Silva; Eric Michael Smith; Ranjan Subramanian; Ellen Xiaoqing; Binh Tan; Ross Tang; Adina Taylor; Jian Williams; Puxin Xiang Kuan; Zheng Xu; Iliyan Yan; Yuchen Zarov; Angela Zhang; Melanie Fan; Sharan Kambadur; Aurélien Narang; Robert Rodriguez; Sergey Stojnic; Thomas Edunov;  Scialom"
+        },
+        {
+            "ref_id": "b49",
+            "title": "Chain-of-thought reasoning without prompting",
+            "journal": "",
+            "year": "2024",
+            "authors": "Xuezhi Wang; Denny Zhou"
+        },
+        {
+            "ref_id": "b50",
+            "title": "Self-consistency improves chain of thought reasoning in language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Xuezhi Wang; Jason Wei; Dale Schuurmans; Quoc V Le; Ed H Chi; Sharan Narang; Aakanksha Chowdhery; Denny Zhou"
+        },
+        {
+            "ref_id": "b51",
+            "title": "Chain-of-thought prompting elicits reasoning in large language models",
+            "journal": "",
+            "year": "2022-12-09",
+            "authors": "Jason Wei; Xuezhi Wang; Dale Schuurmans; Maarten Bosma; Brian Ichter; Fei Xia; Ed H Chi; V Quoc; Denny Le;  Zhou"
+        },
+        {
+            "ref_id": "b52",
+            "title": "Generating sequences by learning to self-correct",
+            "journal": "",
+            "year": "2023",
+            "authors": "Sean Welleck; Ximing Lu; Peter West; Faeze Brahman; Tianxiao Shen; Daniel Khashabi; Yejin Choi"
+        },
+        {
+            "ref_id": "b53",
+            "title": "Autogen: Enabling next-gen LLM applications via multi-agent conversation framework",
+            "journal": "",
+            "year": "",
+            "authors": "Qingyun Wu; Gagan Bansal; Jieyu Zhang; Yiran Wu; Shaokun Zhang; Erkang Zhu; Beibin Li; Li Jiang; Xiaoyun Zhang; Chi Wang"
+        },
+        {
+            "ref_id": "b54",
+            "title": "Progressive learning for person re-identification with one example",
+            "journal": "IEEE Trans. Image Process",
+            "year": "2019",
+            "authors": "Yu Wu; Yutian Lin; Xuanyi Dong; Yan Yan; Wei Bian; Yi Yang"
+        },
+        {
+            "ref_id": "b55",
+            "title": "Self-evaluation guided beam search for reasoning",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yuxi Xie; Kenji Kawaguchi; Yiran Zhao; James Xu Zhao; Min-Yen Kan; Junxian He; Michael Qizhe Xie"
+        },
+        {
+            "ref_id": "b56",
+            "title": "Dq-lore: Dual queries with low rank approximation re-ranking for incontext learning",
+            "journal": "",
+            "year": "",
+            "authors": "Jing Xiong; Zixuan Li; Chuanyang Zheng; Zhijiang Guo; Yichun Yin; Enze Xie; Zhicheng Yang; Qingxing Cao; Haiming Wang; Xiongwei Han; Jing Tang; Chengming Li; Xiaodan Liang"
+        },
+        {
+            "ref_id": "b57",
+            "title": "Learning to simulate natural language feedback for interactive semantic parsing",
+            "journal": "Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Saurabh Hao Yan; Yintao Srivastava; Sida I Tai; Wen-Tau Wang; Ziyu Yih;  Yao"
+        },
+        {
+            "ref_id": "b58",
+            "title": "Re3: Generating longer stories with recursive reprompting and revision",
+            "journal": "",
+            "year": "",
+            "authors": "Kevin Yang; Yuandong Tian; Nanyun Peng; Dan Klein"
+        },
+        {
+            "ref_id": "b59",
+            "title": "Tree of thoughts: Deliberate problem solving with large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Shunyu Yao; Dian Yu; Jeffrey Zhao; Izhak Shafran; Tom Griffiths; Yuan Cao; Karthik Narasimhan"
+        },
+        {
+            "ref_id": "b60",
+            "title": "Large language models as analogical reasoners",
+            "journal": "",
+            "year": "",
+            "authors": "Michihiro Yasunaga; Xinyun Chen; Yujia Li; Panupong Pasupat; Jure Leskovec; Percy Liang; Ed H Chi; Denny Zhou"
+        },
+        {
+            "ref_id": "b61",
+            "title": "The unreliability of explanations in few-shot prompting for textual reasoning",
+            "journal": "",
+            "year": "2022-12-09",
+            "authors": "Xi Ye; Greg Durrett"
+        },
+        {
+            "ref_id": "b62",
+            "title": "Improving language models via plug-and-play retrieval feedback",
+            "journal": "",
+            "year": "",
+            "authors": "Wenhao Yu; Zhihan Zhang; Zhenwen Liang; Meng Jiang; Ashish Sabharwal"
+        },
+        {
+            "ref_id": "b63",
+            "title": "Large language models are human-level prompt engineers",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yongchao Zhou; Andrei Ioan Muresanu; Ziwen Han; Keiran Paster; Silviu Pitis; Harris Chan; Jimmy Ba"
+        },
+        {
+            "ref_id": "b64",
+            "title": "",
+            "journal": "GPT-4 Complex",
+            "year": "",
+            "authors": ""
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1: The framework of LECO. LECO first obtains an initial solution for the input problem. Then, we progressively collect the correct steps from the latest solution until the final answer is obtained.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 2 :2Figure 2: Evaluation of the changes after the rethink stage. We compare our LECO and RCI on GSM8K and StrategyQA datasets with GPT-3.5. W2R: the wrong answer is changed to right. R2W: the right answer is altered to wrong. W2W: a wrong answer is changed to another wrong answer. No change: The answer remains unchanged.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 3 :3Figure 3: The distribution of correct and incorrect solutions of GSM8K by GPT-3.5-Turbo. The curve in pink represents incorrect answers, and the curve in blue represents correct answers.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 4 :4Figure 4: The relation between overall confidence and inter-step transition scores",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "QuestionAshoe store was having a weekend sale on a brand of popular tennis shoes.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Performance of GPT models on logical reasoning, commonsense reasoning, and arithmetic reasoning tasks.",
+            "figure_data": "ModelMethodDateCommonsense CSQA StrategyQAAQuAArithmetic SVAMPGSM8KAvg.CoT80.8079.6973.2551.5784.0077.8674.53Complex84.2077.3369.8454.4981.2580.8974.67ADPSC83.6075.9268.9951.9778.8979.0073.06SC84.4877.4770.3755.5181.681.0375.08GPT-3.5RCI74.9768.3451.9435.5079.9575.2564.33LECO+CoT82.8 (+2.00)79.77 (+0.08)71.13 (-2.12)52.72 (+1.15)85.00 (+1.00)78.24 (+0.38)74.93 (+0.40)LECO+Complex84.92 (+0.72)77.68 (+0.35)71.05 (+1.21)56.77 (+2.28)82.35 (+1.10)82.33 (+1.44)75.85 (+1.18)CoT92.8087.4683.6371.6093.0594.8487.23Complex90.4086.4082.7571.9490.9095.4286.30ADPSC89.2085.6783.8770.0888.9994.0985.32SC90.7286.8183.7572.1993.4995.5186.67GPT-4RCI89.8886.1674.6247.5990.5986.2379.18LECO+CoT93.60 (+0.80)87.63 (+0.17)83.25 (-0.38)71.99 (+0.39)93.55 (+0.50)95.14 (+0.30)87.53 (+0.30)LECO+Complex90.80 (+0.40)86.90 (+0.50)83.97 (+1.22)72.33 (+0.39)91.40 (+0.50)95.68 (+0.26)86.85 (+0.55)ModelMethodAlgebraCountGeometrySubset IterNumPrealgebraPrecaculusAvg.Complex58.5530.8029.8317.4631.9361.1115.3935.01ADPSC54.2228.1826.8913.6928.9359.7014.3432.28GPT-3.5SC56.2030.8729.9817.6532.2561.8018.1335.27RCI49.7924.2518.7610.1625.0953.7113.0827.83LECO+Complex58.72 (+0.17)34.70 (+3.90)31.89 (+2.06)18.80 (+1.34)33.37 (+1.44)62.21 (+1.10)18.53 (+3.14)36.89 (+1.88)Complex69.0650.3238.6225.3346.3976.9828.2347.85ADPSC60.1340.1330.5515.8437.3969.4621.1039.23GPT-4SC71.0452.2340.4825.8950.3777.8430.5149.77RCI65.4946.9329.7116.5643.6873.9927.0743.35LECO+Complex71.92 (+2.86)53.27 (+3.05)41.13 (+2.51)27.49 (+2.16)49.14 (+2.75)78.29 (+1.31)32.02 (+3.79)50.47 (+2.62)"
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "Performance of DeepSeekMath-7B on GSM8K and MATH, where Count represents counting and probability subset; Iter refers to intermediate algebra subset; Num means number theory subset.incorporate two suites of public demonstrations, namely exemplars from vanilla CoT(Wei et al., 2022) and exemplars from complex-CoT (Complex;Fu et al. 2023), which are prompts with higher reasoning complexity to improve language models multi-step reasoning ability.",
+            "figure_data": "We compare LECO with several baselines, including self-consistency (SC; Wang et al. 2023),adaptive self-consistency (ADPSC; Aggarwal et al. 2023), and RCI"
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "LECO can consistently improve the reasoning performance on GSM8K and MATH datasets, indicating its effectiveness on open-source models.On the other hand, LECO also exhibits its superiority in reducing token consumption. As shown in Section A.2, although adaptive self-consistency has tried to reduce the iterations and token consumption by settings the early stop criterion, it still needs almost 4.46 rounds to determine the final answer while RCI needs 2.74 rounds. However, using the similar stop criterion of RCI, LECO can reach the final answer just with 2.15 rounds. This phenomenon suggests that learning from correctness is more effective than learning from errors, as it does not necessitate the model's understanding of the error cues. Additionally, during each iteration, LECO reduces API consumption by alleviating prompting the model to identify",
+            "figure_data": "ModelsMethodsDatasets GSM8K StrategyQAComplex82.4770.17GPT-3.5Random82.09 (-0.38)69.96 (-0.21)Complex95.3482.69GPT-4Random95.22 (-0.12)83.37 (+0.68)"
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": "",
+            "figure_data": "GSM8KExact Correct Partial Correct WrongOnly AVG38953Only DIV351649Only TRANS422434AVG+DIV AVG+TRANS DIV+TRANS36 50 4714 16 1650 34 37LECO531037: Coarse-grained level abla-tion study on GSM8K and StrategyQAdatasets with GPT-3.5."
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "",
+            "figure_data": "Methods Complex RANDOM ORACLE LECODataset StrategyQA GSM8K 31 10 25 13 36 22 33 21Models GPT-3.5Methods Complex Early stopDatasets GSM8K StrategyQA 81.58 70.94 82.03 69.31 (+0.45) (-1.63)GPT-4Complex Early stop95.11 95.41 (+0.30)81.25 81.87 (+0.62)"
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "Average consumed in/out tokens on MATH dataset with OpenAI models.",
+            "figure_data": "ModelsMethodsGSM8KAlgebraCountGeometryMath IterNumPrealgebraPrecaculusDeepSeekComplex LECO+Complex3.8M/275K 8.7M/589K2.8M/376K 6.2M/878K1.1M/144K 2.7M/353K1.1M/159K 2.8M/410K2.1M/425K 5.4M/1.1M1.2M/189K 3.1M/458K2.0M/195K 4.6M/457k1.3M/272K 3.4M/708K"
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "table",
+            "figure_id": "tab_8",
+            "figure_caption": "Average consumed in/out tokens on MATH and GSM8K datasets with DeepSeek model.",
+            "figure_data": "ModelMethodDataset Date CSQA StrategyQA AuQA SVAMP GSM8KAvg.ADPSC4.314.214.435.134.274.424.46GPT-3.5RCI LECO+CoT2.39 2.162.90 2.082.57 2.183.67 2.162.56 2.142.35 2.202.74 2.15LECO+Complex2.112.082.172.432.242.292.22ADPSC4.284.324.565.444.394.214.53GPT-4RCI LECO+CoT2.08 2.002.31 2.022.47 2.052.9 2.083.21 2.052.25 2.052.54 2.04LECO+Complex2.012.052.082.242.132.082.10"
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "Average iterations on diverse datasets with OpenAI models.",
+            "figure_data": "ModelMethodAlgebra Count GeometryDataset IterNum Prealgebra PrecaculusAvg.ADPSC5.365.926.215.846.765.596.366.01GPT-3.5RCI LECO+Complex2.59 2.522.83 2.833.00 2.812.75 2.912.97 2.782.58 2.422.78 2.942.79 2.74ADPSC6.447.225.917.708.635.038.387.04GPT-4RCI LECO+Complex3.31 2.473.41 2.753.51 2.93.41 2.793.43 2.633.27 2.313.29 2.813.38 2.66"
+        },
+        {
+            "figure_label": "12",
+            "figure_type": "table",
+            "figure_id": "tab_10",
+            "figure_caption": "Average iterations on MATH dataset with OpenAI models.",
+            "figure_data": "ModelsMethodsGSM8KAlgebraCountGeometryMATH IterNumPrealgebraPrecaculusAvg.DeepSeekLECO+Complex2.252.222.442.462.522.452.252.592.40"
+        },
+        {
+            "figure_label": "13",
+            "figure_type": "table",
+            "figure_id": "tab_11",
+            "figure_caption": "Average iterations on MATH and GSM8K datasets with DeepSeek model.",
+            "figure_data": "ModelsMethodsGSM8KDataset StrategyQAgpt-3.5-turbo-0613Early Stop 8.0M/367.6K 1.7M/132.7K LeCo 8.2M/393.8K 1.9M/181.9Kgpt-4Early Stop 7.0M/315.7K 1.7M/162.3K LeCo 7.4M/334.2K 1.8M/167.3K"
+        },
+        {
+            "figure_label": "14",
+            "figure_type": "table",
+            "figure_id": "tab_12",
+            "figure_caption": "Average Token Consumption on GSM8K and StrategyQA of Early-stop LECO",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "14",
+            "figure_type": "table",
+            "figure_id": "tab_13",
+            "figure_caption": "and 15 presents the average token consumptions and average iteration numbers on the GSM8K and StrategyQA datasets using OpenAI models via early-stop LECO. Early Stop of LECO Require: input questions x, model M, demonstration Demo x , standard LECO(*), sample amount R, solution score sln score(*), normalize function norm(*) 1: sample correct set C = ∅, sample incorrect set E = ∅ ▷ Initialize sample score set 2: for x s ∈ 0, . . . , R do ▷ incorrect, σ incorrect = norm(E) 11: threshold t = µ incorrect + σ incorrect 12: for x ns ∈ R + 1, . . . do ▷ Early Stop Stage 13: y 0 ns = M (x ns , Demo x ) ▷ The subscript ns represents the remaining part. LECO(x 0 ns , M, Demo x , y 0 ns )",
+            "figure_data": "Algorithm 2 Sample Stage3: 4: 5:y t s = LECO(x s , M, Demo x ) if y t s is correct then C ← C ∪ sln score(y t s )▷ The subscript s represents the sampling stage6:else7:E ← E ∪ sln score(y t s )8:end if9: end for10: µ 14: 15: 16:if sln score(y 0 ns ) >t then y t ns = y 0 ns else17: y t ns = 18: end if19: end for20: return y tModelsMethodsDataset GSM8K StrategyQAgpt-3.5-turbo-0613Early Stop LeCo2.16 2.392.11 2.17gpt-4Early Stop LeCo2.032.06 2.08Table 15: Average Iterations on GSM8K and StrategyQA of Early-stop LECOK135Complex81.880.8983LeCo + Complex82.8382.3383.87(+1.03) (+1.44) (+0.87)"
+        },
+        {
+            "figure_label": "16",
+            "figure_type": "table",
+            "figure_id": "tab_14",
+            "figure_caption": "Settings of Hyperparameter K",
+            "figure_data": "τ0.10.20.30.40.5Complex81.1680.9880.8982.4683.03LeCo+Complex 82.4682.2482.3383.8883.84(+1.3) (+1.26) (+1.44) (+1.42) (+0.81)"
+        },
+        {
+            "figure_label": "17",
+            "figure_type": "table",
+            "figure_id": "tab_15",
+            "figure_caption": "Settings of Hyperparameter τ",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "18",
+            "figure_type": "table",
+            "figure_id": "tab_16",
+            "figure_caption": "19 and 20 lists the specific cases of reasoning results via different methods on GSM8K, StrategyQA, and MATH datasets.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "18",
+            "figure_type": "table",
+            "figure_id": "tab_17",
+            "figure_caption": "Case Study of LECO on GSM8K by ",
+            "figure_data": "QuestionCould JPMorgan Chase give every American $10?Gold AnswerYesLet's think step by step.CoT"
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "avg score i = 1 |s i | |s i | ∑ j=1 p i,j(1)",
+            "formula_coordinates": [
+                4.0,
+                255.51,
+                653.84,
+                249.49,
+                30.0
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "diver score i = ln(KLD τ (P i , U) + 1), (2",
+            "formula_coordinates": [
+                5.0,
+                228.56,
+                187.0,
+                272.56,
+                11.7
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": ")",
+            "formula_coordinates": [
+                5.0,
+                501.12,
+                187.99,
+                3.87,
+                9.58
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "trans score i = 1 K K ∑ j=1 p i,j(3)",
+            "formula_coordinates": [
+                5.0,
+                254.95,
+                345.44,
+                250.04,
+                28.82
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "s i score = avg score i + trans score i -diver score i (4)",
+            "formula_coordinates": [
+                5.0,
+                199.89,
+                427.85,
+                305.1,
+                11.03
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "y 0 = M (x 0 , Demo x ) ,(5)",
+            "formula_coordinates": [
+                5.0,
+                259.11,
+                583.1,
+                245.89,
+                10.97
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": "x t ← x t-1 + y t-1 (s < e), y t = M (x t , Demo x ) .(6)",
+            "formula_coordinates": [
+                6.0,
+                200.85,
+                526.88,
+                304.15,
+                10.92
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "sln score = 1 |sln| sln ∑ i=1 s i score -sln diver,(7)",
+            "formula_coordinates": [
+                9.0,
+                218.85,
+                706.93,
+                286.14,
+                28.82
+            ]
+        },
+        {
+            "formula_id": "formula_8",
+            "formula_text": "• 2 4 • 2 3 + 3 5 • 2 4 • 2 3 + 3 5 • 2 4 • 2 3 = 3 10 .",
+            "formula_coordinates": [
+                24.0,
+                387.15,
+                614.19,
+                98.57,
+                9.52
+            ]
+        }
+    ],
+    "doi": "10.48550/ARXIV.2310.20689"
+}

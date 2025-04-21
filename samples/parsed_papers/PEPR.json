@@ -1,0 +1,751 @@
+{
+    "title": "Prompt Exploration with Prompt Regression",
+    "caption": "Overview of PEPR utilization",
+    "authors": "Michael Feffer; Ronald Xu; Yuekai Sun; Mikhail Yurochkin",
+    "pub_date": "",
+    "abstract": "In the advent of democratized usage of large language models (LLMs), there is a growing desire to systematize LLM prompt creation and selection processes beyond iterative trial-and-error. Prior works majorly focus on searching the space of prompts without accounting for relations between prompt variations. Here we propose a framework, Prompt Exploration with Prompt Regression (PEPR), to predict the effect of prompt combinations given results for individual prompt elements as well as a simple method to select an effective prompt for a given use-case. We evaluate our approach with open-source LLMs of different sizes on several different tasks.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": "Large language models (LLMs) have captured the public's attention and imagination over the past couple of years and are poised to impact various sectors and industries going forward. By prompting and training LLMs in certain ways, researchers, practitioners, and end-users have adapted them to specific problems. This said, success has varied due to randomness quintessential to LLMs. Thus, despite growing interest in prompt engineering, processes involved in deriving prompts differ little from iterative trial-and-error.\nWe focus on a specific type of prompt engineering problem. Namely, given an LLM, a dataset of inputs, and a prompt library composed of individual prompt elements that can be chained together, our goal is to predict how element combinations affect LLM outputs and use these predictions to derive an optimal prompt for the given task. Though this problem does not involve searching over an entire language space, the solution space still grows exponentially with the number of prompt library elements, rendering brute-force approaches practically intractable. Therefore, to address this prompt library search problem, we propose our method, Prompt Exploration with Prompt Regression (PEPR).\nUsing PEPR involves three steps that are outlined in Figure 1, and PEPR itself comprises two procedures. After building a prompt library for the given task, the prompt regression part of PEPR derives parameter weights for each prompt library element based on how much it affects LLM outputs. Using these weights, the next part of PEPR, prompt selection, chooses prompt elements relative to desired behavior. Finally, the overall prompt is recovered after this prompt selection step. Both the prompt regression and prompt selection parts can leverage either reference text generations or human-labeled preference information to yield prompts in line with the provided data.\nFigure 1: Overview of PEPR utilization. After building a prompt library, the prompt regression step of PEPR uses the prompt library in conjunction with reference text or preference information to determine the influence of each prompt element on overall output. The second step, prompt selection, uses the parameters derived from prompt regression and data corresponding to desired behavior to select prompt elements in line with this behavior. Finally, the overall prompt is recovered from prompt selection.\nOverall, our contributions are as follows:\n• To our knowledge, we are (or are among) the first to work on this prompt library search problem, which we define more rigorously in the following sections. • We provide mathematical definitions and formulae for the prompt regression and prompt selection components of PEPR. • We validate both PEPR components using several open-source LLMs across a variety of different datasets and tasks, and • We outline clear next steps for future work in this area.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Related Work",
+            "text": "Prompt engineering We draw inspiration from the work of Prasad et al. (2023), who note that not all parts of a prompt may be helpful for obtaining good LLM output. As such, they split prompts into parts and iteratively search for the most effective prompts through substituting, adding, and removing these parts. Our approach is similar in that we search for the best way to combine elements from a prompt library given a prompt regression model, but we do not consider substitution or addition operations. We also discuss our findings with those of Sclar et al. (2023) and Zhao et al. (2021) in mind, as they discover that minute prompt formatting like spacing and punctuation can have nontrivial effects on LLM performance. While we do not explore differences at such granular levels, we are concerned with obtaining the best prompt for a given task by building it from a set of prompt elements, which we argue is a similar problem and note their takeaways accordingly. Other prior work considers prompt engineering in the form of iterating on in-context learning examples (e.g., Liu et al. (2022)), prompt template (e.g., Jiang et al. (2020)), keywords (e.g., Shin et al. (2020)), and task description (e.g., Zhang et al. (2023)). In a recent paper, Shi et al. (2024) consider the problem of general prompt iteration with limited resources by framing the issue of choosing a prompt from a given set as a special case of a multi-armed bandit problem. While we also note resource consumption and utilize a fixed set of potential prompt elements in our work, we diverge from their findings and contributions in that PEPR explores how these elements interact with each other and predicts the effects of adding or removing elements from the prompt on resulting performance without the need to evaluate every prompt variation. In this sense, we conjecture we are among the first to work on this and related problems.\nLanguage model alignment Our work builds on-top of foundational LLM research exploring reinforcement learning from human feedback (RLHF) (Ouyang et al., 2022), in-context learning (Brown et al., 2020), and Constitutional AI (Bai et al., 2022). Namely, our prompt regression and optimization processes for preference data are inspired by preference learning approaches found in the work of Ouyang et al. (2022). Moreover, our application of the ) is similar to the application in the direct preference optimization (DPO) work of Rafailov et al. (2023), but we note that we diverge from their work in that our score/reward function differs from theirs (as they additionally incorporate log-probabilities of the unprompted base model in their formulation) and furthermore they perform LLM training based on their BT model application whereas we perform regression and optimization over a prompt library. Regarding the work of Brown et al. (2020) with in-context learning and Bai et al. (2022) with Constitutional AI, our prompt regression and optimization methods should work with prompt libraries composed of in-context learning examples or LLM principles. Our work is therefore also similar to that of Sun et al. (2023) who introduce a pipeline for fine-tuning and aligning LLMs to principles, but we again note that we diverge from these works in that we perform no LLM training but rather build an effective prompt from a library. Thus, our work also extends that of Liu et al. (2022) who note that not all in-context learning examples are equally effective. In a similar fashion, our method aims to build an effective prompt from a prompt library whose elements may differ in both the type and magnitude of effect they have on the LLM in question.",
+            "publication_ref": [
+                "b13",
+                "b17",
+                "b24",
+                "b8",
+                "b6",
+                "b19",
+                "b23",
+                "b18",
+                "b11",
+                "b2",
+                "b0",
+                "b11",
+                "b14",
+                "b2",
+                "b0",
+                "b20",
+                "b8"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompt Regression",
+            "text": "Here, we detail the theory and assumptions behind prompt regression, the first of two parts in our approach to prompt optimization, and illustrate our empirical results.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompt Regression Methodology",
+            "text": "Consider an LLM π and a library of prompts s = (p 1 , . . . , p K ) whose prompt elements p k each steer the LLM in certain ways (e.g., in Constitutional AI (Bai et al., 2022) or via in-context learning (Brown et al., 2020)). Our main goal is to be able to easily predict the effect of an arbitrary combination of prompts from the library on the model's behavior.",
+            "publication_ref": [
+                "b0",
+                "b2"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompt regression for log-probability data",
+            "text": "Let I = {I k ∈ {0, 1}} K k=1\n, where I k = 1 implies that element p k is included in the prompt s(I ). We posit that the log-probability of response y given input x and prompt s(I ) is a convex combination of the log-probabilities, or logprobs, of response y given x and elements p k ∈ I:\nlog π(y | (s(I), x)) ≈ ∑ k:I k =1 λ k (I) log π(y | (p k , x)), (3.1)\nwhere λ(I ) ∈ ∆ |s(I)|-1 is a set of weights corresponding to each element. 1 To model these weights efficiently, we assume that the elimination or addition of an element from the prompt library does not affect interactions between the other prompts. This assumption is motivated by social choice theory, where it is known as the independence of irrelevant alternatives (Ray, 1973). Our model of the weights is thus\nλ k (I) = λ k ∑ m∈I λ m , (3.2)\nwhere\nλ k := λ k ({I m = 1} K m=1 ), i.e.\n, the weight of the prompt element when prompting with the complete prompt library s. We learn {λ k } K k=1 via a simple constraint regression:\nmin λ∈∆ K-1 n ∑ i=1 log π(y i | (s, x i )) -∑ k λ k δ i k 2 , δ i k := log π(y i | (p k , x i )). (3.3)\nWe note two key advantages of our method:\n1. (3.1) allows us to estimate the effect of any of the 2 K -1 prompt combinations while only evaluating K + 1 prompts for fitting λ; 2. solving (3.3) does not require knowledge of the reference (correct) y for the inputs {x i } n i=1 (e.g., when there is a finite set of meaningful generations, such as classification or multiple-choice QA, one can simply plug every possible y for every input x i when fitting the regression coefficients). 2We denote this method as PEPR-R as it utilizes reference (log-probability) data.\nPrompt regression for preference data Aligning LLMs to human preferences is often based on preference data, e.g., RLHF (Ouyang et al., 2022), where annotators choose a preferred response from several options. Classification and multiple-choice QA can also be viewed as preference data where the correct answer is preferred over others. We demonstrate how our method can be used to automate prompt engineering using preference data.\nLet {(x i , y 1 i , y 2 i )} n i=1 be a dataset of inputs x i and potential LLM responses y 1 i and y 2 i , where y 1 i is preferred over y 2 i . We adopt a Bradley-Terry (BT) model (Bradley, 1984):\nP{y 1 ⪰ y 2 | x; π, s(I )} = 1 1 + exp β log π(y 2 | (s(I), x)) -log π(y 1 | (s(I), x)) , (3.4)\nwhere ⪰ indicates preference, β > 0 is a temperature parameter, and our score/reward function is log-probability of the associated response. 3 Instead of performing constraint regression to minimize the difference between estimated and actual log-probabilities, we can substitute log π(\ny i | (s, x i )) with log P{y 1 ⪰ y 2 | x; π, s(I )} ≈ log π(y 1 i | (s, x i )) -log π(y 2 i | (s, x i )),\nthe approximate4 log-likelihood of desired preferences and do the same with\nδ i k := log π(y i | (p k , x i )).\nThe resulting objective function is\nmin λ∈∆ K-1 n ∑ i=1 log π(y 1 i | (s, x i )) -log π(y 2 i | (s, x i )) -∑ k λ k δ i k 2 , δ i k := log π(y 1 i | (p k , x i )) -log π(y 2 i | (p k , x i )). (3.5) The resulting prompt regression model is therefore log π(y 1 i | (s(I), x)) -log π(y 2 i | (s(I), x)) ≈ ∑ k:I k =1 λ k (I)[log π(y 1 i | (s(I), x)) -log π(y 2 i | (s(I), x))]. (3.6)\nSimilarly to regressing on log-probabilities, we do not require knowledge of which of y 1 and y 2 is preferred with preference data. This allows us to use additional \"unlabeled\" data to learn λ. We name this method PEPR-P as it uses preference (log-probability difference) data.",
+            "publication_ref": [
+                "b15",
+                "b11",
+                "b1"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompt Regression Experiments",
+            "text": "We conducted several experiments to test the independence of irrelevant alternatives assumption by evaluating both versions of PEPR in their ability to predict prompt effects using four different types of datasets and several open-source LLMs.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Toy Dataset",
+            "text": "We sample 100 prompts from the databricks-dolly-15k dataset (Conover et al., 2023) and embed a subset of prompt library elements in the system prompt of evaluated LLMs to generate responses like those of a pirate. We then apply PEPR with the full library to build a system prompt aligned with pirate responses.",
+            "publication_ref": [
+                "b4"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "HateCheck",
+            "text": "We use test set data from the HateCheck dataset (R öttger et al., 2020) to validate our method. The creators of this dataset note that while hate speech detectors typically do well with overt hate speech, they perform poorly in nuanced scenarios (e.g., reclaimed slurs, hate speech counters). To this end, we crafted a prompt library to address these limitations and applied PEPR to build system prompts to respond to examples with hateful or non-hate depending on content. Note that we run prompt selection once per data class for each of the 11 classes present in the dataset (i.e., we subset data and build a system prompt for that class accordingly, but we regress with all data regardless of class).\nCAMEL We leverage the Biology and Physics datasets generated from the CAMEL experiments (Li et al., 2023) to test the method on text generation. We sample 100 points from each dataset and apply PEPR to uncover the prompts that generate the best outputs from LLMs in line with those of subject matter experts.",
+            "publication_ref": [
+                "b7"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Natural Instructions",
+            "text": "We use data corresponding to several tasks from the Natural Instructions (NI) dataset (Mishra et al., 2022). Specifically, we randomly select 100 data points each from tasks 020 (recognize if the answer to a question is in some context), 195 (sentiment analysis), and 199 (determine if sentences agree with one another) and apply PEPR to build prompts that produce aligned outputs from LLMs.\nModels For all experiments, we evaluated our approach using models from the Llama-2-chat family of LLMs (Touvron et al., 2023). As their instruction following and system prompt features lend well to our goal of building the best prompts for particular use-cases, we opt for the chat versions of these language models over their base model variants.\nFor all models and datasets, we used prompts created from our prompt library as system prompts and obtained logprobs and logprob differences associated with desired and undesried generations based on these prompts. After obtaining results from individual prompt elements and the entire prompt library (fed as a single prompt), we performed regression and estimated the behavior of prompts of size 2, 3, and 4. We then compared the predicted results to the behavior of the ground-truth prompt combinations (of the same sizes and element compositions). Note that for datasets with open-ended text responses (such as some of the NI tasks and our Toy Dataset), we work with average logprobs across response tokens (i.e., log-probability of response divided by number of tokens) as well as their differences.  , for a regression model reflecting the effects of 10 prompts, we aim to illustrate how its predictions of the prompt with elements 2 and 5 compare to ground-truth outputs). While there appear to be no clear trends across model size, PEPR-P appears to do the same or better than PEPR-R in most cases. Additionally, both versions of PEPR have low error and high correlation in general, suggesting that our assumption of the independence of irrelevant alternatives typically holds.",
+            "publication_ref": [
+                "b10",
+                "b21"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Results",
+            "text": "Table 1: Overview of differences between prompt regression and prompt selection. Prompt regression does not require knowledge of ground-truth, whereas prompt selection does to build an appropriate prompt. PEPR-R formulae are used here; replacing logprobs with differences yields an equivalent table for PEPR-P.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompt Regression",
+            "text": "Prompt Selection Input π, {x i }, p 1 , . . . , p K ; π, {x i }, p 1 , . . . , p k ; possible generations y 1 i , y 2 i for x i s correct generation y i for x i s Process Learn λ k s.t. for all i ∑ k λ k log π(y 1 i |x i , p k ) ≈ log π(y 1 i |x i , p 1 , . . . , p K ) ∑ k λ k log π(y 2 i |x i , p k ) ≈ log π(y 2 i |x i , p 1 , . . . , p K ) Learn I k s.t. max I ∑ i log π(y i | (s(I, x i ))\nOutput Regression model parameters λ k Prompt element selectors I k",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompt Selection",
+            "text": "Here, we show how PEPR can be used for prompt engineering by describing the second part of our approach: prompt selection (see Table 1 for differences from regression).",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompt Selection Methodology",
+            "text": "Just as prompt regression can leverage either reference generations or preference data to predict LLM outputs, so too can prompt selection to choose an effective subset of prompt elements from the library. We describe each version of selection accordingly.\nPrompt selection via log-probability data prompt regression Let {(x i , y i )} n i=1 be a dataset of inputs and corresponding reference outputs. To select the prompt maximizing the likelihood of reference output generations, we apply our model from (3.1) and solve max\nI ∑ i log π(y i | (s(I, x i )) → max I 1 ∑ k λ k I k ∑ i ∑ k λ k I k (-δ i k ) = ∑ k λ k I k R k ∑ k λ k I k , (4.1)\nwhere\nR k = -∑ i δ i k and δ i k := log π(y i | (p k , x i )) as defined in (3.\n3). This is an instance of an integer program which are typically hard to solve, but, fortunately, we can cast it as a simple linear program by relaxing I k ∈ [0, 1] and applying the Charnes-Cooper transformation for linear-fractional programming (Charnes & Cooper, 1962). The resulting solution is guaranteed to be on the boundary of the feasible set, i.e., recovering binary I k ∈ {0, 1} prompt selection variables. See Appendix A for details.",
+            "publication_ref": [
+                "b3"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompt selection via preference data prompt regression",
+            "text": "Now suppose we have a dataset {(x i , y 1 i , y 2 i )} n i=1\nsimilar to the prior one except that instead of reference outputs y i , we have preference data in the form of potential outputs y 1 i , y 2 i for each input x i such that y 1 i ⪰ y 2 i . Our goal is to find a prompt maximizing the approximate log-likelihood of desired preferences using the prompt regression model corresponding to preferences (3.6): max\nI ∑ i log P{y 1 i ⪰ y 2 i | x; π, s(I )} → max I ∑ i ∑ k λ k (I)(log π(y 1 i | (p k , x i )) -log π(y 2 i | (p k , x i )).\nThis is the same as (4.1) substituting\nδ i k := log π(y 1 i | (p k , x i )) -log π(y 2 i | (p k , x i )).",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Prompt Selection Experiments",
+            "text": "To evaluate our approach, we run both versions of PEPR against each dataset to select prompts from prompt libraries and compute performance metrics to assess effectiveness relevant to the given task. For our Toy Dataset, our performance metric is accuracy, i.e., whether the model is more likely to generate the desired pirate output (for each instance, 1 if so, 0 otherwise). For HateCheck sections and Natural Instructions tasks, our metric is top-1 accuracy, i.e., whether the prompted model exhibits correct behavior based on the given input. For the CAMEL datasets, we utilize BERTScore (Zhang et al., 2020) to measure generation quality. The CAMEL datasets do not have preferences, thus only PEPR-R is applicable. We utilize the same models, datasets, and logprobs described in Section 3.2 with the caveat that the optimizing data employed corresponds to desired outputs (in the form of reference generations or known preferences depending on the version of PEPR evaluated).\nIn each setting, we search for the best prompt of at most four elements.\nOur baselines for these experiments come in the form of a minimally-prompted model (the LLM with basic instructions relative to the task such as, \"You are a hate speech detector\" (see Appendix B.1) and prompts generated from our libraries at random. For the random prompt sampling baseline we match the evaluation budget of PEPR (see Appendix A for details). Moreover, we run each experiment repeatedly (typically around 1000 times), varying the amount of data used for prompt selection, while reporting the performance on all of the available data. Note that for PEPR-R prompt selection, our reference data are only logprobs corresponding to desired responses (as the likelihood of those responses is what we aim to maximize) unlike the case of PEPR-R regression (for which we use data from all responses as the type of response does not matter).  7 Overall, PEPR prompts perform well, frequently scoring above the 75th percentile of all prompts and sometimes reaching the maximum performance possible. We observe that PEPR-P typically ties or scores better than PEPR-R and conjecture this is due to PEPR-P taking logprobs of undesired responses into account (via the logprob differences) alongside those of desired responses when performing prompt selection, in contrast to PEPR-R which only considers logprobs of desired responses. The better performance of PEPR-P is similar to our higher correlation finding in our prior regression experiments, and additionally we again note no clear PEPR performance trends with model size in our prompt selection experiments. In many cases, PEPR can achieve the best or worst results with Llama-2-13Bchat, evidencing that increases in scale may not always help.8 \nIn addition, we find that PEPR can outperform baselines even when the amount of labeled data (i.e., inputs where either reference or preference outputs are available) used for prompt selection is small. Note that \"0.05\" corresponds to about 5 labeled points in most experiments, i.e., a few-shot scenario where prompt selection is more appealing than fine-tuning. This low labeled data setting is arguably a more likely application of methods for prompt selection. Moreover, PEPR's prompt selection performance in this small data regime is nearly the same as its prompt selection performance with all of the data for the datasets we explore, additionally suggesting that PEPR is effective in this domain. 9 Furthermore, PEPR outperforms the random baseline by a large margin on the CAMEL Biology and Physics generation tasks in terms of BERTScore. BERTScore compares similarity of generated and reference text, and is thus more sensitive to the prompt, while accuracy only takes into account predictions over a single next token, which we observed to be less sensitive to prompts in our experiments.\nIn the Appendix Table 5, we additionally compare to TRIPLE-SH (Shi et al., 2024), a recent algorithm for prompt selection adapting the best arm identification strategy, i.e., it evaluates a few samples with each prompt recursively, eliminating the worst performing prompts at every stage. This algorithm requires evaluating at least a single sample per prompt candidate, which is infeasible in some settings (assuming an evaluation budget comparable to PEPR) since the number of prompt candidates is of the order of 2 K for a prompt library of K elements. PEPR bypasses this limitation due to its ability to model the effects of prompt element combinations via prompt regression without the need to evaluate all of the possible prompts. Given a higher evaluation budget, TRIPLE-SH and PEPR perform comparably.",
+            "publication_ref": [
+                "b22",
+                "b18"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_14"
+            ]
+        },
+        {
+            "heading": "Discussion",
+            "text": "Key takeaways PEPR illustrates that given a fixed set of prompt elements, it is not necessary to evaluate every possible prompt to learn its effect. Namely, related prompts (such as ones that share prompt elements) have related effects (in terms of changes in LLM performance and output) that can be measured and predicted efficiently, eliminating the need to try every prompt. This is supported by the low error and high correlation of our prompt selection experiment results in Section 3.2 and in Appendix B. These findings in turn alleviate the need for a brute-force search that grows exponentially with library size.\nLimitations Upon closer scrutiny of our prompt selection results in Table 2 and Appendix B, one may observe that our random baseline ties or outperforms both versions of PEPR in a nontrivial number of instances. We acknowledge this, but we also note that many of the cases in which our methods outperform random combinations are ones in which the prompt library has some unhelpful elements (e.g., Toy Dataset, Biology) and in contrast, at least a few cases in which our methods do not outperform random combinations are ones in which the prompt library has many helpful elements (e.g., HateCheck). This suggests that PEPR is effective at filtering out bad prompt elements (such that it can easily find a good prompt) and not as effective at optimally combining good prompt elements (meaning it cannot always find the best prompt). We also argue that the regression and optimization framework provided by PEPR is more interpretable in addition to being more robust than trying prompt combinations at random. Even so, we emphasize that the prompt selection part of PEPR can benefit from future research and that our prompt regression results are interesting as a standalone contribution. In addition, both parts of PEPR are straightforward yet effective solutions to this prompt library search problem.\nRegarding the prompt library, another potential limitation of our work is our findings are only limited to the prompt libraries we tried for each dataset. Given the formatting issues discovered by Sclar et al. (2023) and Zhao et al. (2021) and prompt iteration operations employed by Prasad et al. (2023) to find effective prompts, one could argue that we may not have found optimal prompts for each dataset because our library was missing (more) useful elements and formatting. In response, we note that our experiments sought to test PEPR against each dataset and use-case, not to achieve state-of-the-art results. As such, we argue that the prompt libraries we utilize here are sufficient as our baselines also leveraged them where appropriate to enable comparisons with PEPR. Furthermore, these libraries were obtained through preliminary experiments and manual refinement not detailed in this work, and the high performance in general of all methods that used them (baselines and PEPR alike) suggests that the libraries at least contain helpful instructions.",
+            "publication_ref": [
+                "b17",
+                "b24",
+                "b13"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_1"
+            ]
+        },
+        {
+            "heading": "Future Work",
+            "text": "We encourage the community to conduct further research and experiments to address the limitations above and explore related approaches. For instance, we note that future experiments could examine the effects of other prompt selection approaches (i.e., alternative log-probability maximization strategies), more complex prompts (with elements like \"ignore previous instructions\" or similar), and more sophisticated prompt regression models (e.g., ones with richer features beyond log-probabilities and differences and/or ones that are nonlinear). Testing whether prompt element ordering has any impacts on final outcomes and observing whether PEPR easily scales with larger prompt libraries would be other useful experiments. Moreover, while we only explore system prompt configurations in this work, experimenting with PEPR using other prompt components (e.g., in-context learning examples, text not part of the system prompt) would be yet another interesting follow-up work. Lastly, while we selected datasets to cover a range of topics pertaining to model safety, algorithmic bias, and everyday usage of LMs, future work could examine more datasets related to these and other topics.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethics Statement",
+            "text": "While our work does not directly deal with ethical issues and usage of LLMs, we acknowledge that PEPR can be utilized for harmful purposes. Namely, as our experiments illustrate how PEPR can discover effective prompts for a variety of harmless and beneficial tasks (such as pirate speech generation, hate speech detection, and knowledge retrieval), they also suggest that PEPR can be used to derive prompts for malicious uses (such as hate speech or misinformation generation). This said, PEPR would require both prompt libraries and data corresponding to such malicious uses and therefore does not come out-of-the-box with harmful capabilities, but we nevertheless highlight the potential risks here and stress that researchers and practitioners should promote responsible usage of our work.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Prompt Selection Program Details",
+            "text": "Based on (4.1), our prompt selection binary integer program has the following optimization function:\nmax I ∑ k λ k I k R k ∑ k λ k I k ,\nwhere\nI k ∈ {0, 1} and R k = -∑ i δ i k .\nIn our setup, we specify an additional constraint on I k , namely that we force j of them to be equal to 1. Failing to do so yields an algorithm that greedily chooses the single prompt element with best performance over the given data, but such an approach overlooks prompts with more than one element that may generalize better to unseen test data. Thus, by including this constraint while relaxing the binary integer constraint so that I k ∈ [0, 1] and turning the summations into vector dot products, one yields the following linear-fractional program:\nmax x (λ ⊙ R) T x λ T x , (A.1) s.t. x T 1 = j, 0 ≤ A I x ≤ 1, (A.2)\nwhere λ =< λ 1 , . . . , λ K >, R =< R 1 , . . . , R K >, x =< I 1 , . . . , I K >, A I is the KxK identity matrix, ⊙ is the element-wise vector product operator, and 0, 1 are vectors of zeroes and ones, respectively. This is a linear-fractional program due to the denominator term in the optimization function, but applying a Charnes-Cooper transformation yields a traditional linear program (Charnes & Cooper, 1962). This is done by first applying a change of variables through multiplying both parts of the fraction in the optimization function and both sides of each constraint by a nonnegative optimization (scalar) variable t. The next and final part of the transformation involves focusing on maximizing the expression corresponding to the numerator while fixing the one for the denominator to 1. More specifically, for this problem instance, the transformation produces the following linear program:\nmax y,t (λ ⊙ R) T y, (A.3) s.t. λ T y = 1, x T 1 = jt, 0 ≤ A I y ≤ 1t, 0 ≤ t (A.4)\nwhere y is a new optimization (vector) variable equivalent to tx as a result of the change of variables. Therefore, after finding optimal values for vector y and variable t under the given constraints, the I k can be obtained by calculating y t . Note that even though the original binary integer constraints were relaxed to construct a solvable linear program, the values of I k obtained by this final program will be contained in {0, 1} (i.e., will be either 0 or 1) because the optimal solution for the linear program must be located on the boundary that delineates the set of its feasible solutions. 10We solve the final program for values of j ∈ [1, c], where c is the largest prompt size (in terms of number of prompt elements) we consider for a given problem, and we select the best prompt (in terms of evaluation on the entire dataset) from all program solves as our overall prompt. Therefore, our approach requires evaluating K + 1 + c prompts in order to discover one that is (predicted to be) effective. The random baseline that we compare against in experiments utilizes the same budget (in terms of number of prompts evaluated) and considers the same set of prompts (i.e., prompts of at most c elements). More specifically, this baseline entails evaluating K + 1 + c prompt element combinations at random from all possible element combinations of length at most c (e.g., for 10 prompt elements and c = 4, our random baseline may first evaluate the third prompt element alone, next the first four prompt elements, then the last three prompt elements, followed by other combinations until 10 + 1 + 4 = 15 total prompts have been evaluated, at which point it outputs the optimal test set performance). Similarly, as the budget for TRIPLE-SH serves as a limit on the number of total LLM interactions Shi et al. (2024), we employ a budget of (K + 1 + c)n when running that algorithm, where n is the number of points we use for evaluation from the given dataset.",
+            "publication_ref": [
+                "b3",
+                "b18"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B Further Experimental Results",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.1 Main Experiment Prompt Libraries",
+            "text": "You should provide users with accurate, relevant, and up-to-date information in your responses, ensuring that the content is both educational and engaging. Try not to respond with \"I'm not sure\". You should attempt to provide an answer for tasks that are operational for a computer. You should speak like a pirate whenever possible.  Strictly adhere to the following rules:\" was prepended to any chosen subset of prompts. (The second sentence was omitted for the unprompted baseline, but the first was used without any prompt elements.)\nBe sure to pay attention to context, as hate speech can be nuanced. Do not label abuse targeted at individuals as hateful. Do not label abuse targeted at non-protected groups (such as professions or political affiliations) as hateful. Note that profanity and slurs are sometimes okay depending on context. Do not label text that rejects hate as hateful. Note that denouncement of hate speech is not hateful. Note that threats towards individuals or non-protected groups are not considered hateful. Account for spelling errors in determining whether text is hateful. Implicit offenses towards protected groups (such as ones without profanity or slurs) should be labeled as hateful. Text that is offensive based on race, gender, sexual orientation, religious affiliation, or country of origin should be labeled hateful.       ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.2 Main Experiment Prompt Regression Results",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Dataset",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.3 Main Experiment Prompt Selection Results",
+            "text": "Table 3: Comprehensive accuracy results are reported in Table 3 with standard deviations pertaining to experiment settings. Models here are from the Llama-2-chat family. We include maximum and high percentile results from all relevant prompt combinations and baselines. Note that the high-performing prompts that PEPR suggests have small standard deviations, suggesting the stability of prompts selected as compared to the random method.  0.98 ± 0.01 0.91 ± 0.00 0.99 ± 0.00 0.94 ± 0.03 0.79 ± 0.00 0.96 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.98 ± 0.01 0.91 ± 0.00 0.99 ± 0.00 0.94 ± 0.03 0.79 ± 0.00 0.96 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.98 ± 0.01 0.91 ± 0.00 0.99 ± 0.00 0.94 ± 0.03 0.79 ± 0.00 0.96 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.97 0.87 1.00 0.95 0.85 1.00 0.99 0.96 1.00\nThreatening language 7B 13B 70B\n1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.00 0.95 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.00 0.95 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.00 0.95 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.01 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.00 0.98 ± 0.00 0.98 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.00 0.98 ± 0.00 0.98 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.00 0.98 ± 0.00 0.98 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.00 0.95 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.00 0.95 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.02 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.00 0.98 ± 0.00 0.98 ± 0.00 1.00 ± 0.00 1.00 ± 0.01 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.00 0.99 ± 0.00 0.98 ± 0.00 0.98 ± 0.00  ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B.4 Supplemental Experiments",
+            "text": "Mistral-7B-Instruct-v0.2 We test our method with an additional model, Mistral AI's Mistral 7B Instruct v0.2 (Jiang et al., 2023), on a subset of datasets used in our main experiments. More specifically, we do so on all datasets except our Toy Dataset and HateCheck. ",
+            "publication_ref": [
+                "b5"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Constitutional AI: Harmlessness from AI Feedback",
+            "journal": "",
+            "year": "2022-12",
+            "authors": "Yuntao Bai; Saurav Kadavath; Sandipan Kundu; Amanda Askell; Jackson Kernion; Andy Jones; Anna Chen; Anna Goldie; Azalia Mirhoseini; Cameron Mckinnon; Carol Chen; Catherine Olsson; Christopher Olah; Danny Hernandez; Dawn Drain; Deep Ganguli; Dustin Li; Eli Tran-Johnson; Ethan Perez; Jamie Kerr; Jared Mueller; Jeffrey Ladish; Joshua Landau; Kamile Kamal Ndousse; Liane Lukosuite; Michael Lovitt; Nelson Sellitto; Nicholas Elhage; Noemi Schiefer; Nova Mercado; Robert Dassarma; Robin Lasenby; Sam Larson; Scott Ringer; Shauna Johnston; Sheer El Kravec; Stanislav Showk; Tamera Fort; Timothy Lanham; Tom Telleen-Lawton; Tom Conerly; Tristan Henighan; Samuel R Hume; Zac Bowman; Ben Hatfield-Dodds; Dario Mann; Nicholas Amodei; Sam Joseph; Tom Mccandlish; Jared Brown;  Kaplan"
+        },
+        {
+            "ref_id": "b1",
+            "title": "14 paired comparisons: Some basic procedures and examples",
+            "journal": "Elsevier",
+            "year": "1984",
+            "authors": "Ralph A Bradley"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Alec Radford, Ilya Sutskever, and Dario Amodei. Language Models are Few-Shot Learners",
+            "journal": "",
+            "year": "2020-06",
+            "authors": "B Tom; Benjamin Brown; Nick Mann; Melanie Ryder; Jared Subbiah; Prafulla Kaplan; Arvind Dhariwal; Pranav Neelakantan; Girish Shyam; Amanda Sastry; Sandhini Askell; Ariel Agarwal; Gretchen Herbert-Voss; Tom Krueger; Rewon Henighan; Aditya Child; Daniel M Ramesh; Jeffrey Ziegler; Clemens Wu; Christopher Winter; Mark Hesse; Eric Chen; Mateusz Sigler; Scott Litwin; Benjamin Gray; Jack Chess; Christopher Clark; Sam Berner;  Mccandlish"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Programming with linear fractional functionals",
+            "journal": "Naval Research Logistics Quarterly",
+            "year": "1962",
+            "authors": "Abraham Charnes; William W Cooper"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Free dolly: Introducing the world's first truly open instruction-tuned llm",
+            "journal": "",
+            "year": "2023",
+            "authors": "Mike Conover; Matt Hayes; Ankit Mathur; Jianwei Xie; Jun Wan; Sam Shah; Ali Ghodsi; Patrick Wendell; Matei Zaharia; Reynold Xin"
+        },
+        {
+            "ref_id": "b5",
+            "title": "",
+            "journal": "",
+            "year": "2023",
+            "authors": "Albert Q Jiang; Alexandre Sablayrolles; Arthur Mensch; Chris Bamford; Devendra Singh Chaplot; Diego De Las Casas; Florian Bressand; Gianna Lengyel; Guillaume Lample; Lucile Saulnier; Renard Lélio; Marie-Anne Lavaud; Pierre Lachaux; Teven Stock; Thibaut Le Scao; Thomas Lavril; Timothée Wang; William El Lacroix;  Sayed"
+        },
+        {
+            "ref_id": "b6",
+            "title": "How can we know what language models know?",
+            "journal": "Transactions of the Association for Computational Linguistics (TACL)",
+            "year": "2020",
+            "authors": "Zhengbao Jiang; Frank F Xu; Jun Araki; Graham Neubig"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Camel: Communicative agents for \"mind\" exploration of large language model society",
+            "journal": "",
+            "year": "2023",
+            "authors": "Guohao Li; Hasan Abed; Al Kader Hammoud; Hani Itani; Dmitrii Khizbullin; Bernard Ghanem"
+        },
+        {
+            "ref_id": "b8",
+            "title": "The 3rd Workshop on Knowledge Extraction and Integration for Deep Learning Architectures",
+            "journal": "",
+            "year": "2022",
+            "authors": "Jiachang Liu; Dinghan Shen; Yizhe Zhang; William B Dolan; Lawrence Carin; Weizhu Chen"
+        },
+        {
+            "ref_id": "b9",
+            "title": "Individual choice behavior",
+            "journal": "John Wiley",
+            "year": "1959",
+            "authors": "Luce Duncan"
+        },
+        {
+            "ref_id": "b10",
+            "title": "Cross-task generalization via natural language crowdsourcing instructions",
+            "journal": "",
+            "year": "2022",
+            "authors": "Swaroop Mishra; Daniel Khashabi; Chitta Baral; Hannaneh Hajishirzi"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Training language models to follow instructions with human feedback",
+            "journal": "",
+            "year": "2022-10",
+            "authors": "Long Ouyang; Jeffrey Wu; Xu Jiang; Diogo Almeida; Carroll Wainwright; Pamela Mishkin; Chong Zhang; Sandhini Agarwal; Katarina Slama; Alex Gray; John Schulman; Jacob Hilton; Fraser Kelton; Luke Miller; Maddie Simens; Amanda Askell; Peter Welinder; Paul Christiano; Jan Leike; Ryan Lowe"
+        },
+        {
+            "ref_id": "b12",
+            "title": "The Analysis of Permutations",
+            "journal": "Journal of the Royal Statistical Society: Series C (Applied Statistics)",
+            "year": "1975",
+            "authors": "R L Plackett"
+        },
+        {
+            "ref_id": "b13",
+            "title": "Grips: Gradient-free, editbased instruction search for prompting large language models",
+            "journal": "the Association for Computational Linguistics",
+            "year": "2023",
+            "authors": "Archiki Prasad; Peter Hase; Xiang Zhou; Mohit Bansal"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Direct Preference Optimization: Your Language Model is Secretly a Reward Model",
+            "journal": "",
+            "year": "2023-05",
+            "authors": "Rafael Rafailov; Archit Sharma; Eric Mitchell; Stefano Ermon; Christopher D Manning; Chelsea Finn"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Independence of irrelevant alternatives",
+            "journal": "Econometrica: Journal of the Econometric Society",
+            "year": "1973",
+            "authors": "Paramesh Ray"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Hatecheck: Functional tests for hate speech detection models",
+            "journal": "",
+            "year": "2020",
+            "authors": "Bertram Paul R Öttger; Dong Vidgen; Zeerak Nguyen; Helen Waseem; Janet B Margetts;  Pierrehumbert"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Quantifying language models' sensitivity to spurious features in prompt design or: How i learned to start worrying about prompt formatting",
+            "journal": "",
+            "year": "2023",
+            "authors": "Melanie Sclar; Yejin Choi; Yulia Tsvetkov; Alane Suhr"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Efficient prompt optimization through the lens of best arm identification",
+            "journal": "",
+            "year": "2024",
+            "authors": "Chengshuai Shi; Kun Yang; Jing Yang; Cong Shen"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Autoprompt: Eliciting knowledge from language models with automatically generated prompts",
+            "journal": "",
+            "year": "2020",
+            "authors": "Taylor Shin; Yasaman Razeghi; Robert L Logan; I V ; Eric Wallace; Sameer Singh"
+        },
+        {
+            "ref_id": "b20",
+            "title": "Principle-driven self-alignment of language models from scratch with minimal human supervision",
+            "journal": "",
+            "year": "2023",
+            "authors": "Zhiqing Sun; Yikang Shen; Qinhong Zhou; Hongxin Zhang; Zhenfang Chen; David Cox; Yiming Yang; Chuang Gan"
+        },
+        {
+            "ref_id": "b21",
+            "title": "Llama 2: Open foundation and fine-tuned chat models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Hugo Touvron; Louis Martin; Kevin Stone; Peter Albert; Amjad Almahairi; Yasmine Babaei; Nikolay Bashlykov; Soumya Batra; Prajjwal Bhargava; Shruti Bhosale"
+        },
+        {
+            "ref_id": "b22",
+            "title": "Bertscore: Evaluating text generation with bert",
+            "journal": "",
+            "year": "2020",
+            "authors": "Tianyi Zhang; Varsha Kishore; Felix Wu; Kilian Q Weinberger; Yoav Artzi"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Auto-instruct: Automatic instruction generation and ranking for black-box language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Zhihan Zhang; Shuohang Wang; Wenhao Yu; Yichong Xu; Dan Iter; Qingkai Zeng; Yang Liu; Chenguang Zhu; Meng Jiang"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Calibrate before use: Improving few-shot performance of language models",
+            "journal": "",
+            "year": "2021",
+            "authors": "Zihao Zhao; Eric Wallace; Shi Feng; Dan Klein; Sameer Singh"
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure2: Predicted-versus-true value plots corresponding to prompt regression experiments on two datasets, NI Task 195 and HateCheck. These in turn illustrate the ability of our prompt regression model to predict LLM outputs when prompt elements and corresponding coefficients are marginalized out of the model (e.g., for a regression model reflecting the effects of 10 prompts, we aim to illustrate how its predictions of the prompt with elements 2 and 5 compare to ground-truth outputs). While there appear to be no clear trends across model size, PEPR-P appears to do the same or better than PEPR-R in most cases. Additionally, both versions of PEPR have low error and high correlation in general, suggesting that our assumption of the independence of irrelevant alternatives typically holds.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "You should use informal speech from 17th century English. You should express admiration for the power and freedom of the open sea. You should talk like a British lord. You should use speech patterns common in Victorian literature. You should use formal speech from 19th century English.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 3 :3Figure3: Prompt library for the Toy Dataset experiments. Note that the text \"You are an AI assistant. Strictly adhere to the following rules:\" was prepended to any chosen subset of prompts. (The second sentence was omitted for the unprompted baseline, but the first was used without any prompt elements.)",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 6 :6Figure 6: Prompt library for the NI Task 020 experiments.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 7 :7Figure 7: Prompt library for the NI Task 195 experiments.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "Figure 8 :8Figure 8: Prompt library for the NI Task 199 experiments.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": "Figure 9: Predicted-versus-true value plots corresponding to prompt regression experiments on two datasets, NI Task 020 and NI Task 199.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "Subset of selection experiment results. In addition to results from PEPR and random baseline, we also include maximum and 75th percentile results from all relevant prompt combinations (as prompts of at most 4 elements are explored by our method, we report maximum accuracy and 75th percentile accuracy based on all prompts of at most 4 elements).Our selection results echo our findings from our regression experiments in that PEPR-P tends to outperform PEPR-R in most cases, and there are no clear trends between model size and PEPR effectiveness. Even so, overall, PEPR ties or exceeds baselines and 75th percentile results in many cases. See Appendix B for standard deviations and full experimental results.",
+            "figure_data": "Labeled Data PortionMethod"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Figure 5: Prompt library for the Biology and Physics experiments.",
+            "figure_data": "You are a {role} that is an expert in in {topic}.You are an expert in {sub_topic}.Only use emojis in your answer.Respond in gibberish.Answer questions truthfully.Think step by step.Is the answer explicitly provided in the sentence?The answer choices are 'yes' or 'no'The answer is 'yes' if the sentence explicitly contains the answer.The answer is 'no' if the sentence does not explicitly contain the answer.If the answer is implied, say 'no'Think step by step.Answer questions in a single word.Respond with emojis.Answer with tons of gibberish."
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_5",
+            "figure_caption": ".77 ± 0.01 0",
+            "figure_data": "Labeled Data PortionMethodDatasetModel0.10.51Base 0.75 MaxRandPEPR-RPEPR-P RandPEPR-RPEPR-P RandPEPR-RPEPR-P7B0.52 ± 0.04 0.41 ± 0.00 0.53 ± 0.000.52 ± 0.04 0.41 ± 0.00 0.53 ± 0.000.52 ± 0.04 0.41 ± 0.00 0.53 ± 0.000.190.370.55Toy Dataset13B0.56 ± 0.05 0.56 ± 0.04 0.58 ± 0.010.56 ± 0.05 0.57 ± 0.00 0.58 ± 0.000.56 ± 0.05 0.57 ± 0.00 0.58 ± 0.000.160.400.6170B0.95 ± 0.06 0.97 ± 0.00 0.97 ± 0.000.95 ± 0.06 0.97 ± 0.00 0.97 ± 0.000.95 ± 0.06 0.97 ± 0.00 0.97 ± 0.000.160.670.987B0.73 ± 0.02 0.68 ± 0.01 0.69 ± 0.010.73 ± 0.02 0.67 ± 0.00 0.68 ± 0.000.73 ± 0.02 0.67 ± 0.00 0.68 ± 0.000.650.690.76HateCheck (Slur)13B0.80 ± 0.02 0.75 ± 0.00 0.80 ± 0.020.80 ± 0.02 0.75 ± 0.00 0.81 ± 0.010.08 ± 0.02 0.75 ± 0.00 0.82 ± 0.000.800.750.8370B0.90 ± 0.03 0.90 ± 0.02 0.83 ± 0.020.90 ± 0.03 0.90 ± 0.00 0.83 ± 0.010.90 ± 0.03 0.90 ± 0.00 0.83 ± 0.000.710.840.957B0.57 ± 0.12 0.68 ± 0.000.55 ± 0.12 0.68 ± 0.000.55 ± 0.12 0.68 ± 0.000.600.670.69Biology13B0.57 ± 0.10 0.65 ± 0.070.58 ± 0.10 0.68 ± 0.030.58 ± 0.10 0.68 ± 0.000.580.670.7070B0.47 ± 0.13 0.68 ± 0.000.47 ± 0.14 0.68 ± 0.000.47 ± 0.14 0.68 ± 0.000.600.680.697B0.53 ± 0.09 0.65 ± 0.000.54 ± 0.09 0.65 ± 0.000.53 ± 0.10 0.65 ± 0.000.530.630.65Physics13B0.58 ± 0.08 0.66 ± 0.000.57 ± 0.08 0.66 ± 0.000.57 ± 0.08 0.66 ± 0.000.540.650.6670B0.51 ± 0.12 0.66 ± 0.000.50 ± 0.12 0.66 ± 0.000.50 ± 0.12 0.66 ± 0.000.610.630.667B0.69 ± 0.10 0.69 ± 0.10 0.70 ± 0.100.74 ± 0.01 0.74 ± 0.01 0.74 ± 0.010.74 ± 0.01 0.74 ± 0.00 0.74 ± 0.000.570.740.76NI 02013B0.71 ± 0.07 0.72 ± 0.05 0.74 ± 0.070.75 ± 0.02 0.76 ± 0.01 0.78 ± 0.000.76 ± 0.01 0.77 ± 0.00 0.78 ± 0.000.640.740.7870B0.71 ± 0.08 0.71 ± 0.08 0.74 ± 0.030.75 ± 0.03 0.74 ± 0.01 0.75 ± 0.000.76 ± 0.01 0.74 ± 0.00 0.75 ± 0.000.520.740.797B0.69 ± 0.10 0.60 ± 0.10 0.55 ± 0.050.74 ± 0.08 0.67 ± 0.02 0.56 ± 0.010.74 ± 0.08 0.67 ± 0.00 0.56 ± 0.000.560.570.85NI 19513B0.62 ± 0.08 0.59 ± 0.03 0.60 ± 0.050.64 ± 0.09 0.62 ± 0.01 0.62 ± 0.050.65 ± 0.08 0.62 ± 0.00 0.66 ± 0.000.560.560.8370B0.74 ± 0.07 0.75 ± 0.05 0.78 ± 0.070.79 ± 0.04 0.80 ± 0.03 0.81 ± 0.010.79 ± 0.03 0.81 ± 0.00 0.81 ± 0.000.560.710.847B0.74 ± 0.10 0.76 ± 0.06 0.74 ± 0.10NI 19913B0.74 ± 0.10 0.77 ± 0.00 0.77 ± 0.0170B0.74 ± 0.09 0.74 ± 0.07 0"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": ".76 ± 0.00 0.76 ± 0.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "",
+            "figure_data": "0.700.770.770.390.770.770.76 ± 0.00 0.76 ± 0.000.590.770.78Labeled Data PortionMethodDatasetModel0.050.25Base 0.75 MaxRandPEPR-RPEPR-P RandPEPR-RPEPR-P7B0.52 ± 0.04 0.41 ± 0.01 0.53 ± 0.000.52 ± 0.04 0.41 ± 0.00 0.53 ± 0.000.190.370.55Toy Dataset13B0.56 ± 0.05 0.56 ± 0.06 0.58 ± 0.010.56 ± 0.05 0.57 ± 0.00 0.58 ± 0.000.160.400.6170B0.95 ± 0.06 0.97 ± 0.00 0.97 ± 0.000.95 ± 0.06 0.97 ± 0.00 0.97 ± 0.000.160.670.987B0.73 ± 0.02 0.68 ± 0.01 0.69 ± 0.010.73 ± 0.02 0.67 ± 0.00 0.68 ± 0.010.650.690.76HateCheck (Slur)13B0.80 ± 0.02 0.74 ± 0.01 0.80 ± 0.030.80 ± 0.02 0.75 ± 0.00 0.81 ± 0.020.800.750.8370B0.90 ± 0.03 0.89 ± 0.02 0.83 ± 0.030.90 ± 0.03 0.90 ± 0.00 0.83 ± 0.020.710.840.957B0.55 ± 0.12 0.68 ± 0.000.55 ± 0.12 0.68 ± 0.000.600.670.69Biology13B0.58 ± 0.10 0.68 ± 0.030.58 ± 0.10 0.68 ± 0.000.580.670.7070B0.47 ± 0.14 0.68 ± 0.000.47 ± 0.14 0.68 ± 0.000.600.680.697B0.54 ± 0.09 0.65 ± 0.000.53 ± 0.10 0.65 ± 0.000.530.630.65Physics13B0.57 ± 0.08 0.66 ± 0.000.57 ± 0.08 0.66 ± 0.000.540.650.6670B0.50 ± 0.12 0.66 ± 0.000.50 ± 0.12 0.66 ± 0.000.610.630.667B0.74 ± 0.01 0.74 ± 0.01 0.74 ± 0.010.74 ± 0.01 0.74 ± 0.00 0.74 ± 0.000.570.740.76NI 02013B0.75 ± 0.02 0.76 ± 0.01 0.78 ± 0.000.76 ± 0.01 0.77 ± 0.00 0.78 ± 0.000.640.740.7870B0.75 ± 0.03 0.74 ± 0.01 0.75 ± 0.000.76 ± 0.01 0.74 ± 0.00 0.75 ± 0.000.520.740.797B0.74 ± 0.08 0.67 ± 0.02 0.56 ± 0.010.74 ± 0.08 0.67 ± 0.00 0.56 ± 0.000.560.570.85NI 19513B0.64 ± 0.09 0.62 ± 0.01 0.62 ± 0.050.65 ± 0.08 0.62 ± 0.00 0.66 ± 0.000.560.560.8370B0.79 ± 0.04 0.80 ± 0.03 0.81 ± 0.010.79 ± 0.03 0.81 ± 0.00 0.81 ± 0.000.560.710.847B0.77 ± 0.00 0.77 ± 0.00 0.77 ± 0.000.77 ± 0.00 0.77 ± 0.00 0.77 ± 0.000.700.770.77NI 19913B0.77 ± 0.01 0.77 ± 0.00 0.77 ± 0.000.77 ± 0.00 0.77 ± 0.00 0.77 ± 0.000.390.770.7770B0.77 ± 0.06 0.76 ± 0.00 0.76 ± 0.000.77 ± 0.00 0.76 ± 0.00 0.76 ± 0.000.590.770.78"
+        },
+        {
+            "figure_label": "4",
+            "figure_type": "table",
+            "figure_id": "tab_8",
+            "figure_caption": "Results on other 10 data classes from the HateCheck dataset. As with results in Table3, standard deviations for prompts selected by PEPR are small, suggesting prompt stability. See(R öttger et al., 2020)  for more details about each class.",
+            "figure_data": "Labeled Data PortionMethod"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_10",
+            "figure_caption": "",
+            "figure_data": "0.980.971.000.981.001.001.001.001.007B0.94 ± 0.04 0.79 ± 0.04 0.80 ± 0.110.94 ± 0.04 0.81 ± 0.00 0.71 ± 0.040.94 ± 0.04 0.81 ± 0.00 0.70 ± 0.000.150.790.98Counter speech13B0.98 ± 0.03 0.94 ± 0.00 0.91 ± 0.020.98 ± 0.03 0.94 ± 0.00 0.91 ± 0.000.98 ± 0.03 0.94 ± 0.00 0.91 ± 0.000.340.861.0070B0.58 ± 0.08 0.55 ± 0.19 0.62 ± 0.000.58 ± 0.08 0.28 ± 0.00 0.62 ± 0.000.58 ± 0.08 0.28 ± 0.00 0.62 ± 0.000.040.360.717B0.99 ± 0.02 0.90 ± 0.00 0.98 ± 0.030.99 ± 0.02 0.91 ± 0.00 0.99 ± 0.000.99 ± 0.02 0.91 ± 0.00 0.99 ± 0.000.610.901.00Abuse against13B0.99 ± 0.02 0.93 ± 0.01 0.88 ± 0.010.99 ± 0.02 0.93 ± 0.00 0.92 ± 0.030.99 ± 0.02 0.93 ± 0.00 0.95 ± 0.000.740.931.00non-prot. targets70B0.75 ± 0.06 0.66 ± 0.00 0.68 ± 0.040.75 ± 0.06 0.66 ± 0.00 0.67 ± 0.030.75 ± 0.06 0.66 ± 0.00 0.65 ± 0.000.490.620.877B0.93 ± 0.01 0.83 ± 0.00 0.93 ± 0.000.93 ± 0.01 0.83 ± 0.00 0.93 ± 0.000.93 ± 0.01 0.83 ± 0.00 0.93 ± 0.000.910.900.96Spelling varia-13B0.89 ± 0.03 0.76 ± 0.00 0.93 ± 0.000.89 ± 0.03 0.76 ± 0.00 0.93 ± 0.000.89 ± 0.03 0.76 ± 0.00 0.93 ± 0.000.840.810.94tions70B1.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.001.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.001.00 ± 0.00 1.00 ± 0.00 1.00 ± 0.001.001.001.00Labeled Data PortionMethodData ClassModel0.050.25Base 0.75 MaxRandPEPR-RPEPR-P RandPEPR-RPEPR-PDerogation7B 13B0.98 ± 0.01 0.91 ± 0.00 0.98 ± 0.00 0.94 ± 0.03 0.79 ± 0.00 00.98 ± 0.01 0.91 ± 0.00 0.99 ± 0.00 0.94 ± 0.03 0.79 ± 0.00 070B"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_11",
+            "figure_caption": "",
+            "figure_data": "0.970.950.990.870.850.961.001.001.007BThreatening lan-13Bguage70B"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_13",
+            "figure_caption": "± 0.04 0.78 ± 0.05 0.82 ± 0.11 0.98 ± 0.03 0.94 ± 0.00 0.90 ± 0.03 0.58 ± 0.08 0.68 ± 0.03 0.62 ± 0.00 0.94 ± 0.04 0.81 ± 0.00 0.74 ± 0.08 0.98 ± 0.03 0.94 ± 0.00 0.91 ± 0.01 0.58 ± 0.08 0.28 ± 0.00 0.62 ± 0.00 ± 0.02 0.90 ± 0.00 0.97 ± 0.04 0.99 ± 0.02 0.94 ± 0.01 0.88 ± 0.02 0.75 ± 0.06 0.66 ± 0.00 0.68 ± 0.04 0.99 ± 0.02 0.90 ± 0.00 0.99 ± 0.01 0.99 ± 0.02 0.93 ± 0.00 0.88 ± 0.00 0.75 ± 0.06 0.66 ± 0.00 0.67 ± 0.03",
+            "figure_data": "0.980.971.000.981.001.001.001.001.007B0.94 0.150.790.98Counter speech13B0.340.861.0070B0.040.360.717B0.99 0.610.901.00Abuse against13B0.740.931.00non-prot. targets70B0.490.620.877B0.910.900.96Spelling varia-13B0.840.810.94tions70B1.001.001.00"
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_14",
+            "figure_caption": "Subset of selection experiment results with TRIPLE-SH baseline. Note that TRIPLE-SH results could not be computed for some smaller values of dataset portions due to too few samples. Evidently, though TRIPLE-SH outperforms both versions of PEPR for some models and datasets, PEPR can be used with small amounts of data (i.e., limited evaluation budget) and is arguably more interpretable. SH PEPR-R PEPR-P TR-SH PEPR-R PEPR-P TR-SH PEPR-R PEPR-P TR-SH PEPR-R PEPR-P",
+            "figure_data": "Labeled Data PortionMethod"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_15",
+            "figure_caption": "Mistral-7B-Instruct-v0.2 results reported in Table6with standard deviations pertaining to experiment settings. We include maximum and high percentile results from all relevant prompt combinations and baselines. ± 0.07 0.73 ± 0.03 0.71 ± 0.03 0.80 ± 0.03 0.76 ± 0.02 0.72 ± 0.03 0.80 ± 0.03 0.77 ± 0.00 0.73 ± 0.00 0.56 0.71 0.83NI199 0.56 ± 0.12 0.40 ± 0.04 0.57 ± 0.14 0.61 ± 0.09 0.40 ± 0.02 0.69 ± 0.09 0.61 ± 0.08 0.39 ± 0.00 0.72 ± 0.00 0.36 0.44 0.73 ± 0.04 0.78 ± 0.02 0.78 ± 0.02 0.78 ± 0.02 0.79 ± 0.01 0.79 ± 0.00 0.76 0.78 0.82 NI 195 0.73 ± 0.08 0.72 ± 0.03 0.70 ± 0.03 0.78 ± 0.04 0.75 ± 0.03 0.72 ± 0.03 0.56 0.71 0.83 NI 199 0.52 ± 0.13 0.40 ± 0.04 0.57 ± 0.14 0.60 ± 0.10 0.40 ± 0.03 0.65 ± 0.13 0.36 0.44 0.73",
+            "figure_data": "Labeled Data PortionMethod"
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "Let I = {I k ∈ {0, 1}} K k=1",
+            "formula_coordinates": [
+                3.0,
+                318.5,
+                405.1,
+                116.81,
+                14.36
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "log π(y | (s(I), x)) ≈ ∑ k:I k =1 λ k (I) log π(y | (p k , x)), (3.1)",
+            "formula_coordinates": [
+                3.0,
+                194.35,
+                459.42,
+                310.65,
+                22.66
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "λ k (I) = λ k ∑ m∈I λ m , (3.2)",
+            "formula_coordinates": [
+                3.0,
+                264.23,
+                555.98,
+                240.76,
+                22.73
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "λ k := λ k ({I m = 1} K m=1 ), i.e.",
+            "formula_coordinates": [
+                3.0,
+                137.25,
+                585.0,
+                116.9,
+                14.14
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "min λ∈∆ K-1 n ∑ i=1 log π(y i | (s, x i )) -∑ k λ k δ i k 2 , δ i k := log π(y i | (p k , x i )). (3.3)",
+            "formula_coordinates": [
+                3.0,
+                161.48,
+                618.67,
+                343.51,
+                30.12
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "P{y 1 ⪰ y 2 | x; π, s(I )} = 1 1 + exp β log π(y 2 | (s(I), x)) -log π(y 1 | (s(I), x)) , (3.4)",
+            "formula_coordinates": [
+                4.0,
+                115.65,
+                308.98,
+                389.35,
+                25.14
+            ]
+        },
+        {
+            "formula_id": "formula_6",
+            "formula_text": "y i | (s, x i )) with log P{y 1 ⪰ y 2 | x; π, s(I )} ≈ log π(y 1 i | (s, x i )) -log π(y 2 i | (s, x i )),",
+            "formula_coordinates": [
+                4.0,
+                159.86,
+                376.92,
+                292.28,
+                32.56
+            ]
+        },
+        {
+            "formula_id": "formula_7",
+            "formula_text": "δ i k := log π(y i | (p k , x i )).",
+            "formula_coordinates": [
+                4.0,
+                108.13,
+                428.81,
+                105.63,
+                14.4
+            ]
+        },
+        {
+            "formula_id": "formula_8",
+            "formula_text": "min λ∈∆ K-1 n ∑ i=1 log π(y 1 i | (s, x i )) -log π(y 2 i | (s, x i )) -∑ k λ k δ i k 2 , δ i k := log π(y 1 i | (p k , x i )) -log π(y 2 i | (p k , x i )). (3.5) The resulting prompt regression model is therefore log π(y 1 i | (s(I), x)) -log π(y 2 i | (s(I), x)) ≈ ∑ k:I k =1 λ k (I)[log π(y 1 i | (s(I), x)) -log π(y 2 i | (s(I), x))]. (3.6)",
+            "formula_coordinates": [
+                4.0,
+                107.69,
+                452.69,
+                397.31,
+                115.56
+            ]
+        },
+        {
+            "formula_id": "formula_9",
+            "formula_text": "Prompt Selection Input π, {x i }, p 1 , . . . , p K ; π, {x i }, p 1 , . . . , p k ; possible generations y 1 i , y 2 i for x i s correct generation y i for x i s Process Learn λ k s.t. for all i ∑ k λ k log π(y 1 i |x i , p k ) ≈ log π(y 1 i |x i , p 1 , . . . , p K ) ∑ k λ k log π(y 2 i |x i , p k ) ≈ log π(y 2 i |x i , p 1 , . . . , p K ) Learn I k s.t. max I ∑ i log π(y i | (s(I, x i ))",
+            "formula_coordinates": [
+                6.0,
+                114.88,
+                534.78,
+                361.85,
+                100.76
+            ]
+        },
+        {
+            "formula_id": "formula_10",
+            "formula_text": "I ∑ i log π(y i | (s(I, x i )) → max I 1 ∑ k λ k I k ∑ i ∑ k λ k I k (-δ i k ) = ∑ k λ k I k R k ∑ k λ k I k , (4.1)",
+            "formula_coordinates": [
+                7.0,
+                152.74,
+                203.08,
+                352.26,
+                26.59
+            ]
+        },
+        {
+            "formula_id": "formula_11",
+            "formula_text": "R k = -∑ i δ i k and δ i k := log π(y i | (p k , x i )) as defined in (3.",
+            "formula_coordinates": [
+                7.0,
+                137.11,
+                241.34,
+                250.59,
+                14.4
+            ]
+        },
+        {
+            "formula_id": "formula_12",
+            "formula_text": "Now suppose we have a dataset {(x i , y 1 i , y 2 i )} n i=1",
+            "formula_coordinates": [
+                7.0,
+                108.13,
+                327.43,
+                395.88,
+                24.89
+            ]
+        },
+        {
+            "formula_id": "formula_13",
+            "formula_text": "I ∑ i log P{y 1 i ⪰ y 2 i | x; π, s(I )} → max I ∑ i ∑ k λ k (I)(log π(y 1 i | (p k , x i )) -log π(y 2 i | (p k , x i )).",
+            "formula_coordinates": [
+                7.0,
+                115.03,
+                397.63,
+                406.77,
+                22.2
+            ]
+        },
+        {
+            "formula_id": "formula_14",
+            "formula_text": "δ i k := log π(y 1 i | (p k , x i )) -log π(y 2 i | (p k , x i )).",
+            "formula_coordinates": [
+                7.0,
+                269.14,
+                431.51,
+                199.58,
+                14.4
+            ]
+        },
+        {
+            "formula_id": "formula_15",
+            "formula_text": "max I ∑ k λ k I k R k ∑ k λ k I k ,",
+            "formula_coordinates": [
+                13.0,
+                271.73,
+                128.03,
+                68.55,
+                24.83
+            ]
+        },
+        {
+            "formula_id": "formula_16",
+            "formula_text": "I k ∈ {0, 1} and R k = -∑ i δ i k .",
+            "formula_coordinates": [
+                13.0,
+                138.02,
+                155.94,
+                125.12,
+                14.4
+            ]
+        },
+        {
+            "formula_id": "formula_17",
+            "formula_text": "max x (λ ⊙ R) T x λ T x , (A.1) s.t. x T 1 = j, 0 ≤ A I x ≤ 1, (A.2)",
+            "formula_coordinates": [
+                13.0,
+                248.7,
+                241.11,
+                256.29,
+                41.32
+            ]
+        },
+        {
+            "formula_id": "formula_18",
+            "formula_text": "max y,t (λ ⊙ R) T y, (A.3) s.t. λ T y = 1, x T 1 = jt, 0 ≤ A I y ≤ 1t, 0 ≤ t (A.4)",
+            "formula_coordinates": [
+                13.0,
+                208.48,
+                405.53,
+                296.52,
+                36.36
+            ]
+        }
+    ],
+    "doi": "10.1016/S0169-7161(84)04016-5"
+}

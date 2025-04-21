@@ -1,0 +1,1078 @@
+{
+    "title": "HuatuoGPT-II, One-stage Training for Medical Adaption of LLMs",
+    "caption": "Schematic of One-stage Adaption of HuatuoGPT-II",
+    "authors": "Junying Chen; Xidong Wang; Ke Ji; Anningzhe Gao; Feng Jiang; Shunian Chen; Hongbo Zhang; Dingjie Song; Wenya Xie; Chuyi Kong; Jianquan Li; Xiang Wan; Haizhou Li; Benyou Wang",
+    "pub_date": "",
+    "abstract": "Adapting a language model (LM) into a specific domain, a.k.a 'domain adaption', is a common practice when specialized knowledge, e.g. medicine, is not encapsulated in a general language model like Llama2. This typically involves a two-stage process including continued pre-training and supervised fine-tuning. Implementing a pipeline solution with these two stages not only introduces complexities (necessitating dual meticulous tuning) but also leads to two occurrences of data distribution shifts, exacerbating catastrophic forgetting. To mitigate these, we propose a one-stage domain adaption protocol where heterogeneous data from both the traditional pre-training and supervised stages are unified into a simple instructionoutput pair format to achieve efficient knowledge injection. Subsequently, a data priority sampling strategy is introduced to adaptively adjust data mixture during training. Following this protocol, we train HuatuoGPT-II, a specialized LLM for the medical domain in Chinese. HuatuoGPT-II achieve competitive performance with GPT4 across multiple benchmarks, which especially shows the state-of-the-art (SOTA) performance in multiple Chinese medical benchmarks and the newest pharmacist licensure examinations. Furthermore, we explore the phenomenon of onestage protocols, and the experiments reflect that the simplicity of the proposed protocol improves training stability and domain generalization. Our code, data, and models are available at https://github.com/FreedomIntelligence/HuatuoGPT-II.",
+    "sections": [
+        {
+            "heading": "Introduction",
+            "text": "Currently, general large language model (LLM), such as the Llama series (Touvron et al., 2023), are developing rapidly. Simultaneously, in some vertical domains 1 , some researchers (Cui et al., 2023;Yang et al., 2023c;Li et al., 2023a) attempt to develop specialized models. Specialized models have the potential to yield results comparable to those of larger models by utilizing a medium-sized model through the exclusion of certain general knowledge (Wang et al., 2024;Chen et al., 2023b;Yang et al., 2023c). For instance, financial knowledge may not be sufficiently usefully in the medical field and can be therefore omitted in moderately-sized medical LLMs, thereby freeing up more capacity for memorizing medical knowledge.\nAdditionally, in a spectrum of evaluation methods, the one-stage protocol of HuatuoGPT-II prove more effective than the traditional two-stage training paradigm.",
+            "publication_ref": [
+                "b25",
+                "b8",
+                "b30"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Contributions",
+            "text": "The key contributions are:\n• A unified protocol for domain adaption. The paper introduces a simplified one-stage domain adaption protocol for training, streamlining the traditionally complex pipeline process.\n• A advanced Chinese medical LLM. Our developed model, HuatuoGPT-II, leverages this protocol to achieve exceptional performance in Chinese healthcare domains, particularly in Traditional Chinese Medicine.\n• A novel generalization Test. A novel benchmark using the fresh 2023 Chinese National Pharmacist Licensure Examination provides a robust assessment of HuatuoGPT-II, addressing test data leakage concerns and demonstrating superior performance of HuatuoGPT-II.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Data Collection",
+            "text": "Domain data is typically divided into two parts: pre-training corpora and fine-tuning instructions.\nMedical Pre-training Corpus Domain corpus is pivotal for augmenting domain-specific expertise. We collect 1.1TB of both Chinese and English corpus, sourced from encyclopedias, books, literature, and web corpus, blending general corpora like C4 and specialized corpora such as PubMed. All the corpora are publicly accessible, detailed in Appendix C. Then, a meticulous collection pipeline are established for curating high-quality domain data, detailed in the Appendix C. As a result, we obtained 5,252,894 premium medical documents for the pre-training corpus.\nMedical Fine-Tuning Instructions For the fine-tuning instruction, We acquire 142K real-world medical questions as instructions from Huatuo-26M (Li et al., 2023c), and had GPT-4 respond to them as outputs. The fine-tuning instruction is utilized to generalize the model's capability to interact with users within the domain. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "One-stage Adaption",
+            "text": "One-stage Adaption strategy aims to unify the conventional Two-stage Adaption process (continued pre-training and supervised fine-tuning) into a single stage, as shown in Figure 1. The adaption process can be executed in two succinct steps: 1) Data unification and 2) One-stage training.\nSubsequently, we will detail our method for adapting to the Chinese healthcare sector and developing and the development of HuatuoGPT-II.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_0"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "Data Unification",
+            "text": "Domain pre-training corpus is pivotal for augmenting domain-specific expertise. However, it faces challenges such as diverse languages and genres, punctuation errors, and ethical concerns in its pre-training corpus. Particularly, there's a noticeable discrepancy between its unsupervised training and the supervised instruction learning in Supervised Fine-Tuning (SFT). Data Unification aims to unify this data into a consistent format, aligning it with SFT data. Traditional methods like those in Cheng et al., 2023 fall short due to the variation in language and genre. Hence, we leverage Large Language Models to achieve effective data unification.\nOur method of data unification is straightforward yet effective. We generate instructions based on the text of the corpus, and then we generate responses based on both the corpus and the instructions.\nThe prompt for generating instructions is shown in Figure 2.\nPlease create a <question> that closely aligns with the provided <text>. Ensure that the <question> is formulated in [target language] and does not explicitly reference the text. You may incorporate specific scenarios or contexts in the <question>, allowing the <text> to serve as a comprehensive and precise answer.\n<text>: [domain-specific corpus] <question>:\nFigure 2: The prompt for question generation.\n[target language] is Chinese, and [domain-specific corpus] refers to a corpus in the domain-specific pre-training corpora.\nAfter obtaining questions from the corpus text, we use the prompt, shown in Figrue 3, to let a Large Language Model (LLM) generate responses based on the questions and the corpus. Therefore, all pre-training corpora are converted into a instruction-output format, identical to our single-turn SFT data. An example of our final SFT data is shown in Table 7.\nHere, we use ChatGPT as the LLM for data unification, converting all the medical corpus into instructions of the same language and genre. As detailed in Appendix F, Data Unification can be achieved independently of external LLMs. In Appendix E, we verified that the selection of LLM for data unification is inconsequential. This strategy also mitigates potential ethical concerns inherent in the corpus. Additionally, we also use statistical and semantic recognition to keep the model-generated answers close to the data's original content, as explained in Appendix H.",
+            "publication_ref": [
+                "b15"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "One-stage Training",
+            "text": "In the one-stage training process, we integrate data from the Medical Pre-training Instruction and Medical Fine-tuning Instruction datasets to form dataset D.  follow. It exacerbates the catastrophic forgetting of the knowledge acquired in the first stage (Bhat et al., 2022). Referring to Touvron et al., 2023, simply mixing all data could hinder the ability of Large Language Models (LLMs). To address this, we introduce a priority sampling strategy in this study. This strategy starts with domain knowledge, gradually transitioning to fine-tuning data while reducing the sampling ratio of previously learned data over time.\nIn the priority sampling strategy, the sampling probability of each data x ∈ D changes over the course of training. The sampling probability of data x at step t during training is:\nP t (x) = π(x) ∑ y∈D-S t π(y)\nHere, π(x) denotes the priority of element x, and S t represents the sampled data before step t. The priority setting and data sampling distribution are delineated in Figure 4. Notably, the priority π(x) is static, whereas the sampling probabilities of each data source dynamically changes. More precisely, consider data sources D t 1 , D t 2 , . . . , D t n ⊆ D -S t at time t, each with an assigned priority Published as a conference paper at COLM 2024\nπ(x ∈ D t i ) = β K i .\nThe probability of selecting an element from D t i is given by:\nP t (x ∈ D t i ) = |D t i |β K i ∑ n j=1 |D t j |β K j\nAfter an element is selected from D t i , the size of\nD t+1 i becomes |D t+1 i | = |D t i | -1, resulting in: P t+1 (x ∈ D t+1 i ) < P t (x ∈ D t i ).\nTherefore, each selection from D i slightly decreases its sampling probability, leading to a dynamic update. The parameter β plays a crucial role in adjusting the sampling intensity among high-priority sources, with higher β values favoring sequential sampling, while lower values encourage mixed sampling.\nTo enable the model to first learn domain capabilities and then gradually shift to instruction interaction learning, we assign a higher priority to pre-training instruction data. Furthermore, to facilitate the model's transition from low to high knowledge density learning, we assign different priorities to the four types of data sources. Appendix I shows details of how we determine sampling priority values for different types of data.",
+            "publication_ref": [
+                "b2",
+                "b25"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experiments",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Experimental settings",
+            "text": "Base Model & Setup HuatuoGPT-II, tailored for Chinese healthcare, builds upon the foundations o f the Baichuan2-7B-Base and Baichuan2-13B-Base models. Since all data consists solely of singleround format instruction, we enrich the Medical Fine-tuning Instruction dataset by integrating ShareGPT data3 . This allows HuatuoGPT-II to support multi-round dialogues while maintaining its general domain capabilities. For training details, please see the Appendix J.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Baselines",
+            "text": "We compare HuatuoGPT-II with several leading general large language models known for their excellent general chat capabilities in Chinese. These models are Baichuan2-7B/13B-Chat (Yang et al., 2023a), Qwen-7B/14B-Chat (Bai et al., 2023) and ChatGLM3-6B (Zeng et al., 2023). Additionally, for the Chinese medical context, we carefully select DISC-MedLLM (Bao et al., 2023) and HuatuoGPT (Zhang et al., 2023) based on an experimental experiment detailed in Appendix R. We also consider leading proprietary models, including ERNIE Bot ( 文心一言) (Sun et al., 2021), ChatGPT(OpenAI, 2022), and GPT-44 (OpenAI, 2023), noted for their extensive parameters and superior performance. For the details of these models, please refer to Appendix M.",
+            "publication_ref": [
+                "b0",
+                "b1",
+                "b39",
+                "b24"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Medical Benchmark",
+            "text": "In this section, we evaluate the medical capabilities of HuatuoGPT-II on popular benchmarks. We focus on four medical benchmarks (MedQA, MedMCQA, CMB, CMExam) and two general benchmarks (C-Eval, CMMLU), focusing specifically on their medical components. See Appendix K for more details on these benchmarks. To ensure fairness, we use the most straightforward prompt for all the models, as shown in Appendix K. The Fresh Medical Exams Tackling data contamination in LLM training is challenging (Huang et al., 2023), especially with extensive and intricate training data. To counter this, we selected the 2023 Chinese National Pharmacist Licensure Examination, held on October 21, 2023, as our benchmarks. This date is crucially before both our data collection cut-off (October 7, 2023) and the release of our assessment models. The annual uniqueness of the exam questions ensures a reliable safeguard against contamination risks. The results in Table 2 show that HuatuoGPT-II ranked second after GPT-4 in the Pharmacy track. However, in the Traditional Chinese Medicine track, HuatuoGPT-II led with 51.6 points. HuatuoGPT-II demonstrated superior performance in average scores across both tracks, highlighting its proficiency in the medical field.",
+            "publication_ref": [
+                "b12"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "Medical Benchmark As shown in",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Medical Response Quality",
+            "text": "To evaluate the model's performance in real-world medical scenarios, we utilize real-wrold questions in both single-round and multi-round formats, sourced respectively from KUAKE-QIC (Zhang et al., 2021) and Med-dialog (Zeng et al., 2020), following the approach of HuatuoGPT (Zhang et al., 2023). The assessment details are provided in the Appendix L.  ",
+            "publication_ref": [
+                "b40",
+                "b38",
+                "b39"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Automatic Evaluation",
+            "text": "We utilize GPT-4 to evaluate which of the two models generated better outputs. The results, as indicated in Table 3 (for more compared baselines, see Table 13), show that HuatuoGPT-II has a higher win rate compared to other models. Notably, HuatuoGPT-II achieve a higher win rate in comparison with GPT-4. Although its fine-tuning data originated from GPT-4, its extensive medical corpus provided it with more medical knowledge, as shown in Table 2.\nExpert Evaluation For further evaluating the quality of the model outputs, we invite four licensed physicians to score them, with the detailed criteria available in the Appendix L.2. Due to the high cost of expert evaluation, we select four models for comparison with HuatuoGPT-II. Results, as outlined in Tables 3, indicate that HuatuoGPT-II consistently outperforms its peers, aligning with automatic evaluation. This consensus between expert opinions and GPT-4's evaluations underscores HuatuoGPT-II's efficacy in medical response generation. The case study on the model's response can be found in Appendix S.  To validate the superiority of One-stage Adaption, we conduct a traditional Two-stage Adaption to fine-tune the the Baichuan2-7B-Base on the same medical data.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_6",
+                "tab_17",
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "One",
+            "text": "Figure 5 shows the training loss of these two training methods. The loss of Two-stage Adaption shows instability, marked by pronounced fluctuations and loss spikes. This instability arises from the varied content and styles within the medical pre-training corpus, which includes four distinct data types as detailed in Table 9. The variation is further amplified by the differences between Chinese and English datasets. Our one-stage Adaption unifies the diverse contents and styles of the pre-training corpus, improving training stability and reducing loss fluctuation. Moreover, due to data discrepancies between the two stages, there is a noticeable loss divergence between the pre-training and fine-tuning stages in Two-stage Adaption. In contrast, One-stage Adaption effectively resolves this issue by simplifying the pre-training corpus into a unified language and style, aligning with SFT data, making a more stable and smooth training process.\nThe results of the previously mentioned experiments also demonstrate that One-stage Adaption achieves better performance than other methods, as shown in Figure 6. It can be seen that on all six datasets, our One-stage Adaption performance is significantly better than the Two-stage Adaption performance (from 5.3% to 23%), especially in single-round Q&A and multi-round conversation tasks. This superiority is likely due to two-stage unification and more effective knowledge generalization in One-stage Adaption.  In evaluating the priority sampling strategy, we tested it across different β settings using the same HuatuoGPT-II (7B) configuration. Our results show that model performance drastically drops when β = 0 (mixed sampling) or when β is excessively high (Sequential Sampling), highlighting the importance of priority sampling. The best performance is achieved when β is around 2.",
+            "publication_ref": [],
+            "figure_ref": [
+                "fig_2"
+            ],
+            "table_ref": []
+        },
+        {
+            "heading": "The Relative Priority for Sampling",
+            "text": "Moreover, we also conducted an ablation study on data unification in appendix G. The experiment indicates that data unification is crucial for the performance improvement of the one-stage training.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Conclusion",
+            "text": "In this work, we propose a one-stage domain adaption method, simplifying the conventional two-stage domain adaption process and mitigating its associated challenges. This approach is straightforward, involving the use of LLM capabilities to align domain corpus with SFT data and adopting a priority sampling strategy to enhance domain adaption. Based on this method, we develop a Chinese medical language model, HuatuoGPT-II. In the experiment, HuatuoGPT-II demonstrates state-of-the-art performance in the Chinese medicine domain across various benchmarks. It even surpasses proprietary models like ChatGPT and GPT-4 in some aspects, particularly in Traditional Chinese Medicine. The experimental results also confirm the reliability of the one-stage domain adaption method, which shows a significant improvement over the traditional two-stage performance. This One-stage Adaption promises to offer valuable insights and a methodological framework for future LLM domain adaption works.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Ethic Statement",
+            "text": "The development of HuatuoGPT-II, a specialized language model for Chinese healthcare, raises several potential risks.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Accuracy of Medical Advice",
+            "text": "While HuatuoGPT-II has shown promising results in the domain of Chinese healthcare, it's crucial to underscore that at this stage, it should not be used to provide any medical advice. This caution stems from the inherent limitations of large language models, including their capacity for generating plausible yet inaccurate or misleading information.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Data Privacy and Ethics",
+            "text": "The ethical handling of data is paramount, especially in the sensitive field of healthcare. The primary data sources for HuatuoGPT-II include medical texts, such as textbooks and literature, ensuring that patient-specific data is not utilized. This approach aligns with ethical guidelines and privacy regulations, ensuring that individual patient information is not compromised. Another significant aspect of our methodology is the 'data unification' process, which aims to address potential ethical issues in the training data. By employing large language models to rewrite the medical corpora, we aim to eliminate any ethically questionable content, thereby ensuring that the training process and the model align with ethical standards. ZDSYS20230626091302006), and Shenzhen Stability Science Program 2023, Shenzhen Key Lab of Multi-Modal Cognitive Computing.\nTable 4: The results of Chinese National Medical Licensing Examinations. The year represents the actual examination year. Note that the exam here may not be complete, and the blue fonts indicates the number of questions.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Chinese Medical Licensing Examination",
+            "text": "To evaluate HuatuoGPT-II's medical competence, we utilize a dataset comprising medical examination questions from China and the United States. This approach aims to measure the model's adaptability and proficiency across varied medical knowledge frameworks and terminologies. The results of the Chinese National Medical Licensing Examination are outlined in Table 4. In the results, HuatuoGPT-II (13B) not only surpassed all open-source models but also closely approached the performance of the leading proprietary model, ERNIE Bot. This notable outcome reflects the model's advanced understanding of Chinese medical principles and its adeptness in applying this knowledge in complex examination contexts. The 13B variant's elevated scores signify enhanced analytical capabilities and deeper comprehension of the nuances inherent in Chinese medical practice.\nCMB-Clin CMB-Clin is a dataset designed to evaluate the Clinical Diagnostic capabilities of LLMs, based on 74 classical complex and real-world cases derived from textbooks. Distinct from the response quality evaluations, CMB-Clin provides standard answers for reference and scores each model individually. We follow the same evaluation strategy from the original paper which utilizes GPT-4 as the evaluator. Results, as delineated in Table 5, indicate that HuatuoGPT-II outperforms its counterparts, excluding GPT-4. Intriguingly, the 7B version of HuatuoGPT-II demonstrates superior efficacy over its 13B variant, a phenomenon potentially attributable to foundational capacity variances, as evidenced by Baichuan2-7B-Chat's superior performance compared to Baichuan2-13B-Chat. Meidcal Books (cn)",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_9"
+            ]
+        },
+        {
+            "heading": "Model",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "De-duplication",
+            "text": "Raw Corpus (1.1 TB)  foundational corpus. We identified four primary data types for extensive collection: encyclopedias, books, academic literature, and web content. Focusing on these categories, we amassed 1.1TB of Chinese and English data, as shown in Table 9.\nThe domain data collection pipeline is an essential part of ensuring the quality of domain language corpora, designed to extract high-quality and diverse domain corpora from large-scale corpora.\nThe methodology encompasses four primary steps:\n1. Extract Medical Corpus: This process aims to remove irrelevant domain corpora, serving as the first step in filtering massive corpora. We employ a dictionary-based approach, obtaining dictionaries containing medical vocabulary from THUOCL 5 and The SPECIALIST Lexicon 6 from the Unified Medical Language System. We strive to exclude non-medical terms to form a domain-specific dictionary. For each text segment, we evaluate whether it's domain-specific by assessing the density of matched domain words from the dictionary. This dictionary method is an effective and efficient way to extract domain text.\n2. Segmentation: Since we need to convert the corpora into instructions and do the data cleaning and de-duplication, it's necessary to segment all corpora into fragments. We divide each text into sentences, then use a moving window to turn the corpus into segments with a length limit, ensuring no loss of information by including sentences before and after the window.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Cleaning:",
+            "text": "We notice a significant proportion of medical corpora is related to medical advertising, despite appearing fluent, contains little domain knowledge and introduces bias. To filter out medical advertisement texts and low-quality texts, we utilize ChatGPT to select problematic texts and train a corpus quality classification model to clean corpora.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "De-duplication:",
+            "text": "De-duplication is a crucial step in corpus processing, as domain knowledge often has significant redundancy. We use a sentence embedding model to convert corpora into embeddings and then employ dense retrieval methods to remove semantically similar texts.\nOur data sources consist of four categories: (1) Web Corpus, which includes C4 (Raffel et al., 2020) and Wudao (Yuan et al., 2021); ( 2) Books, primarily comprising Textbook and the_pile_books3 (Gao et al., 2020); (3) Encyclopedia, encompassing Chinese Medical Encyclopedia and Wikipedia; (4) Medical Literature, which consists of PubMed and Chinese literature. Following the aforementioned steps, the corpus is converted into 5,252K of instruction data.",
+            "publication_ref": [
+                "b23",
+                "b36",
+                "b9"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "D Example of Data Unification",
+            "text": "Table 7 illustrates the process of generating instruction and response based on documents in Data Unification.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Description content",
+            "text": "Raw Data (from English Textbook)\nIt is one of the most frequent mental illnesses, making up a large proportion of persons in assisted living and skilled nursing facilities. Although Alzheimer disease has been described at every period of adult life, the majority of patients are in their sixties or older; a relatively small number have been in their late fifties or younger....",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Query of Data Unification",
+            "text": "什么是阿尔茨海默病的主要临床和病理特征？( Translation: What are the main clinical and pathological features of Alzheimer's disease?)\nAnswer of Data Unification 阿尔茨海默病是一种最常见的精神疾病，占据了较大比例的辅助生活和专业护理设施的人群。虽然阿尔茨 海默病在成年期的各个阶段都可能出现，但大多数患者在六十岁或以上；只有一小部分在五十多岁甚至更年 轻...(Translation: Alzheimer's disease is one of the most common mental illnesses, occupying a larger percentage of the population in assisted living and skilled nursing facilities. Although Alzheimer's disease can occur at all stages of adulthood, most patients are in their sixties or older; only a small percentage are in their fifties or even younger...) Table 7: An example of our final SFT data.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "E Pre-training Instruction: Knowledge Provision",
+            "text": "As shown in Section 3.1, we use external LLMs (like ChatGPT) for data unification for two main purposes:\n1. Data Unification using ChatGPT: The primary data source at this stage is raw medical corpora, not ChatGPT. ChatGPT is merely utilized for data refinement and back translation. Its function is similar to rule-based data polishing software or a fine-tuned T5 model, where medical expertise is not essential. We will subsequently present a case study using 'Baichuan2-Chat-7B' as an alternative for data unification.\n2. Fine-tuning Datasets using GPT-4 and ChatGPT: Our fine-tuning data and ShareGPT are used to train our model to follow instructions and engage in conversation. However, they don't significantly contribute to the medical knowledge of our model. This aligns with the 'Superficial Alignment Hypothesis', suggesting that a model's knowledge and capabilities are primarily derived during its pre-training phase. Instruction fine-tuning mainly guides the model to apply specific formats and styles during user interaction, rather than substantially enhancing its knowledge base.\nTo illustrate, we conduct experiments to deeply analyze how using external large models affects HautuoGPT-II's medical knowledge. We sample 1/40 of our pre-training and fine-tuning data to assess their impact on the model's medical capability: The comparison between Experiments #4 and #5 shows that augmenting pre-training data is more effective than adding an equivalent amount of instruction tuning data. This suggests that the enhancement in medical knowledge benchmarks is primarily due to the raw data itself. ChatGPT play a role in transforming this raw data into formats that are more digestible for the trained LLMs, leading to our model outperforming ChatGPT and GPT-4 in medical benchmarks.\nExper. No. # Fine-\nFurthermore, as outlined in Appendix M, leading Chinese medical models like DISC-MedLLM also employ ChatGPT and GPT-4 for their training data construction, yet our model surpasses them in domain benchmarks.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "F Data Unification without External LLMs",
+            "text": "To eliminate the performance improvement of our method caused by relying on external large language models, we experimente with adapting Baichuan2-7B-Chat in the medical domain using our method, without the assistance of other LLMs. We randomly select 5% of the pre-training corpus and medical queries, using Baichuan2-7B-Chat itself for data unification and direct response to the SFT-data's queries as fine-tuning data, a process we term as self-data-unification. The experiment is carried out as shown in Table F.\nThe results show that when using self-data-unification to perform self-data-unification, our method named One-stage Adaptation still exceeds Two-stage Adaptation by an average of 6.6 points. This Table 9: Adaptation gaps between Two-stage and On-stage adaptation.\nMoreover, we find even Baichuan2-7B-Chat demonstrates a good ability to perform data-unification, as shown in the Table 10:\nDescription content Raw Data(from PubMed)\nThe functional and structural alterations of the striatum in chronic spontaneous urticaria. The brain has long been known to be the regulation center of itch, but the neuropathology of chronic itch, su ch as chronic spontaneous urticaria (CSU)...  To validate the importance of Data Unification, we conducted an ablation study on Data Unification using a reduced dataset (5% due to time constraints) as shown in figure G.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_13"
+            ]
+        },
+        {
+            "heading": "Query of Data Unifi",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "H Deviate Detection",
+            "text": "In the data unification phase, we instruct LLM to refer to the text content to provide a detailed response. The responses are expected to mainly contain information from the text. However, the ability of the language models to follow instructions can't be fully guaranteed, and there might be instances where the model answers a question without referring to the text. To ensure that the response contains text knowledge, we adopt the following two methods to detect deviations from the original text:\n1. Statistical Method: We convert both the text and the response into sets of 1-grams, and then use the Jaccard Similarity Coefficient to calculate the similarity between these two sets to determine the similarity of content between the text and the response. We set a threshold to detect content deviations.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Model Detection Method:",
+            "text": "The first method is suitable for detection within the same language, but it cannot handle cases where the English text is translated into a Chinese response. Therefore, we rely on a more robust method. We have people annotate whether an answer deviates and use this data to train a large language model for response content detection.\nBased on these detection methods, if a generated response fails the tests, we instruct the Large Language Model (LLM) to regenerate it.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "I Priority Sampling Strategy",
+            "text": "In this section, we first explain how we handle ordering between pre-training and SFT data, and then give details of ordering within pre-training data\nOrder between pre-training and SFT data We adopt a sequential training approach, prioritizing Pre-training Data followed by Fine-tuning Data (Pre-training Data→Fine-tuning Data). This method mirrors human learning processes: akin to initially learning from textbooks before attempting exercises. The rationale is straightforward comprehensive foundational knowledge, gained from pre-training data, should precede the more specific applications found in fine-tuning data. This sequence prevents a scenario akin to attempting exercises without sufficient textbook study, which could lead to random guesses and, in the context of our model, the propensity to generate inaccurate or 'hallucinated' information. Additionally, the fine-tuning data, often structured in a question-andanswer format, closely aligns with real-world user interactions. By introducing this type of data later in the training process, we ensure that the model is better attuned to actual user scenarios, enhancing its practical applicability and effectiveness.\nOrder within pre-training data Data quality is gauged using the data sampling epochs from the LLaMA (Touvron et al., 2023) study, as is shown in Table 12.\nInitially, the significance of different data sources, as determined by sampling epochs in LLaMA, was ranked as \"Web Corpus→Literature→Books→Encyclopedia\". Nevertheless, after consulting with medical experts, it became clear that Books should be accorded greater importance. Consequently, we have adjusted our training sequence to: Web Corpus→Literature→Encyclopedia→Books. Lastly, we set the relative priority, a hyper-parameter in priority sampling.\nTranslation:\nPlease answer the following multiple choice questions.\nOf little significance in assessing the prognosis of a patient with cirrhosis is ",
+            "publication_ref": [
+                "b25"
+            ],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "L Details of HuatuoEval",
+            "text": "We utilize the single-round and multi-round evaluation data from HuatuoGPT (Wang et al., 2023b) to evaluate the model's medical response capability. Sources from these datasets include KUAKE-QIC (Zhang et al., 2021) for single-round questions and Med-dialog (Zeng et al., 2020) for multiround cases. We slightly modify these evaluations for fairer assessment, focusing on the information in the answers rather than the tone of a doctor's response.\nThis evaluation is designed to evaluate the response capabilities of large-scale language models in medical scenarios. It includes two types of evaluations. The first type assesses the singleround answer capability, primarily comprising real patient questions sourced from KUAKE-QIC.\nThe second type is a multi-round diagnostic evaluation, with data containing real patient case information, sourced from Med-dialog. In the single-round evaluation, we have the models directly answer medical questions. In the multi-round evaluation, we simulate a patient asking questions to a doctor using ChatGPT, based on the patient's medical record information. The simulated patient's prompt is shown as below( [Patient Case Information] is patient case in multi-round data of HuatuoEval.). The models then engage in dialogue with the simulated patient to generate conversations. For a fair comparison, we have the ChatGPT-simulated patient continuously asking questions, and each model must respond twice.   • Llama2-7B/13B-Chat (Touvron et al., 2023) Llama2 series are successors models of Llama trained on 2 trillion tokens with diverse datasets. Their chat model has robust performance. Unlike the first three Chinese-supported models, Llama2 series are English models.\nAdditionally, we select two representative and strong large language models for Chinese medical scenario. (we conducted an experimental experiment to select these two models, see Appendix R for details). These models are:\n• DISC-MedLLM (Bao et al., 2023) DISC-MedLLM is fine-tuned over 470K medical data and 34k general domain conversation and instruction samples.\n• HuatuoGPT (Zhang et al., 2023) HuatuoGPT is trained using real-world data and distilled data from ChatGPT, adopting RLMF (a method combining ChatGPT and doctor preferences) to leverage the advantages of mixed data.\nProprietary Baselines Furthermore, we compare three representative proprietary models, which have larger parameters and stronger performance:\n• ERNIE Bot ( 文心一言) (Sun et al., 2021) ERNIE bot is a closed-source large predictive model developed by Baidu. It is one of the strongest Chinese language models to date, with an API interface and a web version available for use.\n• ChatGPT(OpenAI, 2022) ChatGPT is a large language model released by OpenAI, possessing significant influence and currently holding an excellent standard among large models.\n• GPT-4(OpenAI, 2023) GPT-4 is a language model published by OpenAI following ChatGPT.\nIt is undoubtedly one of the most powerful and widely used large language models currently available.",
+            "publication_ref": [
+                "b40",
+                "b38",
+                "b25",
+                "b1",
+                "b39",
+                "b24"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "N Distribution of Synthesized Questions",
+            "text": "We sampled 100 questions from the pre-training instructions and manually categorized their type as follows:\nYes ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "O Performance on Different Sizes of Models",
+            "text": "The effect differences of HuatuoGPT2 with different model parameters: ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "P Other SFT Data",
+            "text": "We conducted experiments with different LLMs to generate SFT data, using 5% of the data, to verify the importance of SFT data. The results are shown in the table.\nIt shows minimal impact with the other LLM, which indicates that SFT data does not provide primary knowledge. ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Q One Stage Training for Other Domains",
+            "text": "The proposed one-stage training protocol is applicable beyond the Chinese medical domain.\nTo address the reviewer's question, we tested it on the MedQA-English (Jin et al., 2021) and CaseHOLD (Zheng et al., 2021) datasets, which represent the English medical and law domains, respectively. For MedQA-English, we used MedQA's English textbooks as the pre-training corpus and its training set for Supervised Fine-Tuning (SFT). For CaseHOLD, we sampled 4% of the corpora from FreeLaw Opinions (Biderman et al., 2022) ",
+            "publication_ref": [
+                "b13",
+                "b41",
+                "b3"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "R Other Medical Models",
+            "text": "When selecting baselines for Chinese medical applications, we also tested the performance of other Chinese medical large models in the Chinese National Medical Licensing Examination. The results, as shown in Table 20, indicate that based on their superior performance, HuatuoGPT and DISC-MedLLM were chosen as the baselines for comparison.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "S Case Study",
+            "text": "In our study, we observed that many models, including GPT-4, experience significant hallucinations in Chinese medical contexts. These hallucinations arise from two factors: 1) The model itself lacks specific medical knowledge; 2) Misconceptions arise in Chinese. Tables 21 and22 present two examples of simple Chinese medical questions about pharmaceuticals.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": [
+                "tab_4",
+                "tab_4"
+            ]
+        },
+        {
+            "heading": "Acknowledgement",
+            "text": "This work was supported by the Shenzhen Science and Technology Program (JCYJ20220818103001002), Shenzhen Doctoral Startup Funding (RCBS20221008093330065), Tianyuan Fund for Mathematics of National Natural Science Foundation of China (NSFC) (12326608), Shenzhen Key Laboratory of Cross-Modal Cognitive Computing (grant number",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A Related Work",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.1 Domain adaption",
+            "text": "Recent research has also indicated that such domain adaption using further training Cheng et al., 2023 leads to a drastic drop despite still benefiting fine-tuning evaluation and knowledge probing tests. This inspires us to design a different protocol for domain adaption. Also, Gunasekar et al. (2023); Li et al. (2023e); Chen et al. (2023c); Kong et al. (2023) show a possibility that the 10B well-selected dataset could achieve comparable performance to a much larger model.",
+            "publication_ref": [
+                "b15",
+                "b11",
+                "b14"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "A.2 Medical LLMs",
+            "text": "The rapid advancement of large language models (LLMs) in Chinese medical field is driven by the release of open-source Chinese LLMs, notably trained via instruction fine-tuning. Doctor-GLM (Xiong et al., 2023) and MedicalGPT (Xu, 2023) are fine-tuned on various Chinese and English medical dialogue datasets. Another Chinese medical LLM, BenTsao (Wang et al., 2023b) is finetuned on distilled data derived from knowledge graphs. Bianque-2 (Chen et al., 2023a) includes multiple rounds of medical expansions, encompassing drug instructions and encyclopedia knowledge instructions. ChatMed-Consult (Zhu & Wang, 2023) is fine-tuned on both Chinese online consultation data and ChatGPT responses. DISC-MedLLM (Bao et al., 2023) is fine-tuned on more than 470,000 medical data including doctor-patient dialogues and knowledge QA pairs. By integrating the reinforcement learning, HuatuoGPT (Zhang et al., 2023) is fine-tuned on a 220,000 medical dataset consisting of ChatGPT-distilled instructions and dialogues alongside real doctorpatient single-turn Q&As and multi-turn dialogues. ZhongJing (Yang et al., 2023b) undergoes a comprehensive three-stage training process: continuous pre-training on various medical data, instruction fine-tuning on single-turn and multi-turn dialogue data as well as medical NLP tasks data, and reinforcement learning adjudicated by experts to ensure reliability and safety.  (Touvron et al., 2023).",
+            "publication_ref": [
+                "b31",
+                "b1",
+                "b39",
+                "b25"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "B Supplementary Experiment",
+            "text": "",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "J Training Detail",
+            "text": "For HuatuoGPT-II, ",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "K Benchmark Details",
+            "text": "We evaluate the medical capabilities of HuatuoGPT-II on popular benchmarks. Here, we select four medical benchmarks and three general benchmarks, noting that we only evaluate the medical part of the general benchmarks. The medical benchmarks include: MedQA (Jin et al., 2021), which is collected from professional medical board exams in various languages. We used its English test set for evaluation. MedMCQA (Pal et al., 2022), amassed from Indian medical entrance exams, and we evaluate it using the development set. CMB (Wang et al., 2023d), a comprehensive medical benchmark in Chinese, where we specifically used the CMB-Exam for evaluation. CMExam (Liu et al., 2023), a comprehensive Chinese medical exam dataset. The general benchmarks include: C-Eval (Huang et al., 2023), an all-encompassing Chinese evaluation framework. CMMLU (Li et al., 2023b), designed to critically appraise the knowledge and reasoning prowess of large language models in Chinese.\nFor the general benchmarks, we only use their medically related evaluation content. For CMMLU, the evaluation sections used are 'clinical knowledge', 'agronomy', 'college medicine', 'genetics', 'nutrition', 'Traditional Chinese Medicine', and 'virology'. For C-Eval, we use the 'clinical medicine' and 'basic medicine' parts.\nSince all evaluations in our experiments are for Chat models, we uniformly adopted a Zero-shot setting, using a consistent form, shown as below:\nThe Prompt for Multi-Round Automatic Evaluation:\n[The Conversation from Model 2] [End of Assistant 2] [System] We would like to request your feedback on two multi-turn conversations between the AI assistant and the user displayed above.\nRequirements: The response should be to the point and adress the problem of user.  ",
+            "publication_ref": [
+                "b13",
+                "b22",
+                "b20",
+                "b12"
+            ],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "L.2 Expert Evaluation",
+            "text": "For manual evaluation, we provide licensed medical doctors with evaluation criteria shown as below. We then offer a platform for experts to conduct evaluations. Experts choose which response (from a pair of model responses) is better. The selection interface is shown in Figure 10. All model information is anonymized and interaction positions are randomized to ensure fairness.\n1. The response should be orientated towards the user's problem and provide a solution.\n2. consider the richness and logical clarity of the model response.\n3. consider the professionalism and accuracy of the model.\n4. the model response should be humanistic.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "M Baselines",
+            "text": "Open-Source Baselines We compare to the most representative general large language models, which possess excellent chat capabilities and are adaptable to various scenarios, including healthcare. They are as follows:\nPublished as a conference paper at COLM 2024  (Chen et al., 2023a) 3.7 2.3 3.5 4.2 4.5 4.0 7.1 4.2 9.0 4.7 5.3 1.6 3.8 5.9 3.7 4.5 ChatMed-Consult (Wang et al., 2023c) 20.0 17.3 14.7 21.3 18.2 20.0 16.7 15.0 17.5 27.8 21.3 19.3 23.8 21.4 19.5 20.0 BenTsao (Wang et al., 2023b) 23.3 26.8 17.2 19.0 19.5 22.1 20.2 20.4 18.8 18.4 24.6 27.5 21.6 18.9 18.1 21.1 ChatGLM-Med (Wang et al., 2023c) 20.7 23.2 20.7 21.8 21.8 22.6 16.7 21.0 15.3 30.3 23.0 29.9 18.5 20.4 24.8 22.0 MedicalGPT (Xu, 2023) 25.0 24. Table 20: The results of the Chinese National Medical Licensing Examination.\nAs shown in Table 21, GPT-4 seems to misunderstand the drug compound 'Methoxyphenamine', essentially providing irrelevant responses. Baichuan2-7B-Chat appears to comprehend this drug but only answers correctly in part, also exhibiting significant hallucinations. In contrast, HuatuoGPT-II accurately and comprehensively addresses the drug's details.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "Query:",
+            "text": "介绍下复方甲氧那明 ( Translation: Introduce compound methoxyphenamine)",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        },
+        {
+            "heading": "GPT-4:",
+            "text": "HuatuoGPT-II(7B): OxyContin has a wide range of applications in the medical field, including for post-operative pain, cancer pain, and chronic pain. However, due to its potent analgesic effects, OxyContin also has the potential to be abused, leading to addiction issues...) Table 22: Chinese medical hallucinations case. The green font indicates correct information, and the brown font indicates incorrect information.\nThese instances highlight GPT-4's limitations in the Chinese medical domain. We believe there is a critical need to enhance domain-specific capabilities, especially for sensitive topics like healthcare, and HuatuoGPT-II appears to be more adept at this during its current developmental phase.",
+            "publication_ref": [],
+            "figure_ref": [],
+            "table_ref": []
+        }
+    ],
+    "references": [
+        {
+            "ref_id": "b0",
+            "title": "Qwen technical report",
+            "journal": "",
+            "year": "2023",
+            "authors": "Jinze Bai; Shuai Bai; Yunfei Chu; Zeyu Cui; Kai Dang; Xiaodong Deng; Yang Fan; Wenbin Ge; Yu Han; Fei Huang"
+        },
+        {
+            "ref_id": "b1",
+            "title": "Disc-medllm: Bridging general large language models and real-world medical consultation",
+            "journal": "",
+            "year": "2023",
+            "authors": "Zhijie Bao; Wei Chen; Shengze Xiao; Kuang Ren; Jiaao Wu; Cheng Zhong; Jiajie Peng; Xuanjing Huang; Zhongyu Wei"
+        },
+        {
+            "ref_id": "b2",
+            "title": "Consistency is the key to further mitigating catastrophic forgetting in continual learning",
+            "journal": "",
+            "year": "2022",
+            "authors": "Prashant Shivaram Bhat; Bahram Zonooz; Elahe Arani"
+        },
+        {
+            "ref_id": "b3",
+            "title": "Datasheet for the pile",
+            "journal": "",
+            "year": "2022",
+            "authors": "Stella Biderman; Kieran Bicheno; Leo Gao"
+        },
+        {
+            "ref_id": "b4",
+            "title": "Bianque: Balancing the questioning and suggestion ability of health llms with multi-turn health conversations polished by chatgpt",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yirong Chen; Zhenyu Wang; Xiaofen Xing; Zhipei Xu; Kai Fang; Junhong Wang; Sihang Li; Jieling Wu; Qi Liu; Xiangmin Xu"
+        },
+        {
+            "ref_id": "b5",
+            "title": "Meditron-70b: Scaling medical pretraining for large language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Zeming Chen; Alejandro Hernández Cano; Angelika Romanou; Antoine Bonnet; Kyle Matoba; Francesco Salvi; Matteo Pagliardini; Simin Fan; Andreas Köpf; Amirkeivan Mohtashami"
+        },
+        {
+            "ref_id": "b6",
+            "title": "Democratizing chatgpt across languages",
+            "journal": "",
+            "year": "2023",
+            "authors": "Zhihong Chen; Feng Jiang; Junying Chen; Tiannan Wang; Fei Yu; Guiming Chen; Hongbo Zhang; Juhao Liang; Chen Zhang; Zhiyi Zhang"
+        },
+        {
+            "ref_id": "b7",
+            "title": "Adapting large language models via reading comprehension",
+            "journal": "",
+            "year": "2023",
+            "authors": "Daixuan Cheng; Shaohan Huang; Furu Wei"
+        },
+        {
+            "ref_id": "b8",
+            "title": "Chatlaw: Open-source legal large language model with integrated external knowledge bases",
+            "journal": "",
+            "year": "2023",
+            "authors": "Jiaxi Cui; Zongjian Li; Yang Yan; Bohua Chen; Li Yuan"
+        },
+        {
+            "ref_id": "b9",
+            "title": "The pile: An 800gb dataset of diverse text for language modeling",
+            "journal": "",
+            "year": "2020",
+            "authors": "Leo Gao; Stella Biderman; Sid Black; Laurence Golding; Travis Hoppe; Charles Foster; Jason Phang; Horace He; Anish Thite; Noa Nabeshima"
+        },
+        {
+            "ref_id": "b10",
+            "title": "An empirical investigation of catastrophic forgetting in gradient-based neural networks",
+            "journal": "",
+            "year": "2013",
+            "authors": "Ian J Goodfellow; Mehdi Mirza; Da Xiao; Aaron Courville; Yoshua Bengio"
+        },
+        {
+            "ref_id": "b11",
+            "title": "Textbooks are all you need",
+            "journal": "",
+            "year": "2023",
+            "authors": "Suriya Gunasekar; Yi Zhang; Jyoti Aneja; Caio César; Teodoro Mendes; Allie Del Giorno; Sivakanth Gopi; Mojan Javaheripi; Piero Kauffmann; Gustavo De Rosa; Olli Saarikivi"
+        },
+        {
+            "ref_id": "b12",
+            "title": "C-eval: A multi-level multi-discipline chinese evaluation suite for foundation models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yuzhen Huang; Yuzhuo Bai; Zhihao Zhu; Junlei Zhang; Jinghan Zhang; Tangjun Su; Junteng Liu; Chuancheng Lv; Yikai Zhang; Jiayi Lei"
+        },
+        {
+            "ref_id": "b13",
+            "title": "What disease does this patient have? a large-scale open domain question answering dataset from medical exams",
+            "journal": "Applied Sciences",
+            "year": "2021",
+            "authors": "Di Jin; Eileen Pan; Nassim Oufattole; Wei-Hung Weng; Hanyi Fang; Peter Szolovits"
+        },
+        {
+            "ref_id": "b14",
+            "title": "Large language model as a user simulator",
+            "journal": "",
+            "year": "2023",
+            "authors": "Chuyi Kong; Yaxin Fan; Xiang Wan; Feng Jiang; Benyou Wang"
+        },
+        {
+            "ref_id": "b15",
+            "title": "Reviving anime character in reality via large language model",
+            "journal": "",
+            "year": "2023",
+            "authors": "Cheng Li; Ziang Leng; Chenxi Yan; Junyi Shen; Hao Wang; Weishi Mi; Yaying Fei; Xiaoyang Feng; Song Yan; Haosheng Wang"
+        },
+        {
+            "ref_id": "b16",
+            "title": "Measuring massive multitask language understanding in chinese",
+            "journal": "",
+            "year": "2023",
+            "authors": "Haonan Li; Yixuan Zhang; Fajri Koto; Yifei Yang; Hai Zhao; Yeyun Gong; Nan Duan; Timothy Baldwin;  Cmmlu"
+        },
+        {
+            "ref_id": "b17",
+            "title": "Xiang Wan, and Benyou Wang. Huatuo-26m, a large-scale chinese medical qa dataset",
+            "journal": "",
+            "year": "2023",
+            "authors": "Jianquan Li; Xidong Wang; Xiangbo Wu; Zhiyi Zhang; Xiaolong Xu; Jie Fu; Prayag Tiwari"
+        },
+        {
+            "ref_id": "b18",
+            "title": "Self-alignment with instruction backtranslation",
+            "journal": "",
+            "year": "2023",
+            "authors": "Xian Li; Ping Yu; Chunting Zhou; Timo Schick; Luke Zettlemoyer; Omer Levy; Jason Weston; Mike Lewis"
+        },
+        {
+            "ref_id": "b19",
+            "title": "Textbooks are all you need ii: phi-1.5 technical report",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yuanzhi Li; Sébastien Bubeck; Ronen Eldan; Allie Del Giorno; Suriya Gunasekar; Yin Tat; Lee "
+        },
+        {
+            "ref_id": "b20",
+            "title": "Benchmarking large language models on cmexam-a comprehensive chinese medical exam dataset",
+            "journal": "",
+            "year": "2023",
+            "authors": "Junling Liu; Peilin Zhou; Yining Hua; Dading Chong; Zhongyu Tian; Andrew Liu; Helin Wang; Chenyu You; Zhenhua Guo; Lei Zhu"
+        },
+        {
+            "ref_id": "b21",
+            "title": "",
+            "journal": "OpenAI. Gpt-4 technical report",
+            "year": "2022",
+            "authors": ""
+        },
+        {
+            "ref_id": "b22",
+            "title": "Medmcqa: A large-scale multi-subject multi-choice dataset for medical domain question answering",
+            "journal": "",
+            "year": "2022",
+            "authors": "Ankit Pal; Logesh Kumar Umapathi; Malaikannan Sankarasubbu"
+        },
+        {
+            "ref_id": "b23",
+            "title": "Exploring the limits of transfer learning with a unified text-to-text transformer",
+            "journal": "The Journal of Machine Learning Research",
+            "year": "2020",
+            "authors": "Colin Raffel; Noam Shazeer; Adam Roberts; Katherine Lee; Sharan Narang; Michael Matena; Yanqi Zhou; Wei Li; Peter J Liu"
+        },
+        {
+            "ref_id": "b24",
+            "title": "Ernie 3.0: Large-scale knowledge enhanced pre-training for language understanding and generation",
+            "journal": "",
+            "year": "2021",
+            "authors": "Yu Sun; Shuohuan Wang; Shikun Feng; Siyu Ding; Chao Pang; Junyuan Shang; Jiaxiang Liu; Xuyi Chen; Yanbin Zhao; Yuxiang Lu"
+        },
+        {
+            "ref_id": "b25",
+            "title": "Llama 2: Open foundation and fine-tuned chat models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Hugo Touvron; Louis Martin; Kevin Stone; Peter Albert; Amjad Almahairi; Yasmine Babaei; Nikolay Bashlykov; Soumya Batra; Prajjwal Bhargava; Shruti Bhosale"
+        },
+        {
+            "ref_id": "b26",
+            "title": "Pretrained language models in biomedical domain: A systematic survey",
+            "journal": "ACM Computing Surveys",
+            "year": "2023",
+            "authors": "Benyou Wang; Qianqian Xie; Jiahuan Pei; Zhihong Chen; Prayag Tiwari; Zhao Li; Jie Fu"
+        },
+        {
+            "ref_id": "b27",
+            "title": "Tuning llama model with chinese medical knowledge",
+            "journal": "",
+            "year": "2023",
+            "authors": "Haochun Wang; Chi Liu; Nuwa Xi; Zewen Qiang; Sendong Zhao; Bing Qin; Ting Liu;  Huatuo"
+        },
+        {
+            "ref_id": "b28",
+            "title": "chatglm-med: 基于中文医学知识 的chatglm模型微调",
+            "journal": "",
+            "year": "",
+            "authors": "Haochun Wang; Chi Liu; Sendong Zhao; Bing Qin; Ting Liu"
+        },
+        {
+            "ref_id": "b29",
+            "title": "A comprehensive medical benchmark in chinese",
+            "journal": "",
+            "year": "2023",
+            "authors": "Xidong Wang; Guiming Hardy Chen; Dingjie Song; Zhiyi Zhang; Zhihong Chen; Qingying Xiao; Feng Jiang; Jianquan Li; Xiang Wan; Benyou Wang"
+        },
+        {
+            "ref_id": "b30",
+            "title": "Lightweight multilingual medical llms towards democratizing medical ai to 6b people",
+            "journal": "",
+            "year": "2024",
+            "authors": "Xidong Wang; Nuo Chen; Junyin Chen; Yan Hu; Yidong Wang; Xiangbo Wu; Anningzhe Gao; Xiang Wan; Haizhou Li; Benyou Wang;  Apollo"
+        },
+        {
+            "ref_id": "b31",
+            "title": "Doctorglm: Fine-tuning your chinese doctor is not a herculean task",
+            "journal": "",
+            "year": "2023",
+            "authors": "Honglin Xiong; Sheng Wang; Yitao Zhu; Zihao Zhao; Yuxiao Liu; Qian Wang; Dinggang Shen"
+        },
+        {
+            "ref_id": "b32",
+            "title": "Training medical gpt model",
+            "journal": "",
+            "year": "2023",
+            "authors": "Ming Xu;  Medicalgpt"
+        },
+        {
+            "ref_id": "b33",
+            "title": "Open large-scale language models",
+            "journal": "",
+            "year": "2023",
+            "authors": "Aiyuan Yang; Bin Xiao; Bingning Wang; Borong Zhang; Chao Yin; Chenxu Lv; Da Pan; Dian Wang; Dong Yan; Fan Yang"
+        },
+        {
+            "ref_id": "b34",
+            "title": "Zhongjing: Enhancing the chinese medical capabilities of large language model through expert feedback and real-world multi-turn dialogue",
+            "journal": "",
+            "year": "2023",
+            "authors": "Songhua Yang; Hanjia Zhao; Senbin Zhu; Guangyu Zhou; Hongfei Xu; Yuxiang Jia; Hongying Zan"
+        },
+        {
+            "ref_id": "b35",
+            "title": "Investlm: A large language model for investment using financial domain instruction tuning",
+            "journal": "",
+            "year": "2023",
+            "authors": "Yi Yang; Yixuan Tang; Kar Yan; Tam "
+        },
+        {
+            "ref_id": "b36",
+            "title": "Wudaocorpora: A super large-scale chinese corpora for pre-training language models",
+            "journal": "AI Open",
+            "year": "2021",
+            "authors": "Sha Yuan; Hanyu Zhao; Zhengxiao Du; Ming Ding; Xiao Liu; Yukuo Cen; Xu Zou; Zhilin Yang; Jie Tang"
+        },
+        {
+            "ref_id": "b37",
+            "title": "GLM-130b: An open bilingual pre-trained model",
+            "journal": "",
+            "year": "",
+            "authors": "Aohan Zeng; Xiao Liu; Zhengxiao Du; Zihan Wang; Hanyu Lai; Ming Ding; Zhuoyi Yang; Yifan Xu; Wendi Zheng; Xiao Xia; Weng Lam Tam; Zixuan Ma; Yufei Xue; Jidong Zhai; Wenguang Chen; Zhiyuan Liu; Peng Zhang; Yuxiao Dong; Jie Tang"
+        },
+        {
+            "ref_id": "b38",
+            "title": "Meddialog: Large-scale medical dialogue datasets",
+            "journal": "",
+            "year": "2020",
+            "authors": "Guangtao Zeng; Wenmian Yang; Zeqian Ju; Yue Yang; Sicheng Wang; Ruisi Zhang; Meng Zhou; Jiaqi Zeng; Xiangyu Dong; Ruoyu Zhang"
+        },
+        {
+            "ref_id": "b39",
+            "title": "towards taming language model to be a doctor",
+            "journal": "",
+            "year": "2023",
+            "authors": "Hongbo Zhang; Junying Chen; Feng Jiang; Fei Yu; Zhihong Chen; Jianquan Li; Guiming Chen; Xiangbo Wu; Zhiyi Zhang; Qingying Xiao"
+        },
+        {
+            "ref_id": "b40",
+            "title": "A chinese biomedical language understanding evaluation benchmark",
+            "journal": "",
+            "year": "2021",
+            "authors": "Ningyu Zhang; Mosha Chen; Zhen Bi; Xiaozhuan Liang; Lei Li; Xin Shang; Kangping Yin; Chuanqi Tan; Jian Xu; Fei Huang"
+        },
+        {
+            "ref_id": "b41",
+            "title": "When does pretraining help? assessing self-supervised learning for law and the casehold dataset of 53,000+ legal holdings",
+            "journal": "",
+            "year": "2021",
+            "authors": "Lucia Zheng; Neel Guha; Peter Brandon R Anderson; Daniel E Henderson;  Ho"
+        },
+        {
+            "ref_id": "b42",
+            "title": "Less is more for alignment",
+            "journal": "",
+            "year": "2023",
+            "authors": "Chunting Zhou; Pengfei Liu; Puxin Xu; Srini Iyer; Jiao Sun; Yuning Mao; Xuezhe Ma; Avia Efrat; Ping Yu; Lili Yu"
+        },
+        {
+            "ref_id": "b43",
+            "title": "A chinese medical large language model",
+            "journal": "",
+            "year": "2016",
+            "authors": "Wei Zhu; Xiaoling Wang"
+        },
+        {
+            "ref_id": "b44",
+            "title": "ChatGLM3-6B 45",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b45",
+            "title": "",
+            "journal": "",
+            "year": "",
+            "authors": "Huatuogpt-Ii "
+        },
+        {
+            "ref_id": "b46",
+            "title": "You are a patient, here is your condition and you are asking the doctor questions related to your condition, note that this is a multi-round questioning process, remember not to let the dialogue end, but continue to ask the doctor questions related to your condition",
+            "journal": "",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b47",
+            "title": "End of Assistant 2] [System] We would like to request your feedback on the two AI assistants in response to the user question displayed above. Requirements: The response should be to the point and adress the problem of user. The description of symptoms should be comprehensive and accurate, and the provided diagnosis should be the most reasonable inference based on all relevant factors and possibilities. The treatment recommendations should be effective and reliable, taking into account the severity or stages of the illness. The prescriptions should be effective and reliable, considering indications, contraindications, and dosages. Please compare the performance of their responses. You should tell me whether Assistant 1 is 'better than', 'worse than', or 'equal to' Assistant 2. Please first compare their responses and analyze which one is more in line with the given requirements",
+            "journal": "Assistant 1 is better than Assistant",
+            "year": "",
+            "authors": ""
+        },
+        {
+            "ref_id": "b48",
+            "title": "( Translation: Compound Methoxyphenamine is a medicine used to relieve flu and cold symptoms",
+            "journal": "",
+            "year": "",
+            "authors": "对乙酰氨基酚(扑热息痛)：这是一种常见的镇痛剂和退热药，用于缓解疼痛和降低由感冒或 流感引起的发热"
+        },
+        {
+            "ref_id": "b49",
+            "title": "In compounded methenamine, it helps to relieve nasal congestion and other related symptoms caused by a cold or flu",
+            "journal": "",
+            "year": "",
+            "authors": " Methoxyphenamine"
+        },
+        {
+            "ref_id": "b50",
+            "title": "This is a common analgesic and antipyretic used to relieve pain and reduce fever caused by colds or flu",
+            "journal": "",
+            "year": "",
+            "authors": " Acetaminophen"
+        },
+        {
+            "ref_id": "b51",
+            "title": "It is a combination of four ingredients: Methoxyphenamine (a bronchodilator), chlorpheniramine (an antihistamine), aluminum hydroxide (a gastric acid inhibitor), and pyridinium methylsulfate (an over-the-counter antipyretic and analgesic)",
+            "journal": "",
+            "year": "",
+            "authors": "、氢氧化铝(一种胃酸抑制剂)和甲基硫酸吡啶酸( 一种非处方解热镇痛药; ) "
+        }
+    ],
+    "figures": [
+        {
+            "figure_label": "1",
+            "figure_type": "figure",
+            "figure_id": "fig_0",
+            "figure_caption": "Figure 1 :1Figure 1: Schematic of One-stage Adaption of HuatuoGPT-II.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "34",
+            "figure_type": "figure",
+            "figure_id": "fig_1",
+            "figure_caption": "Figure 3 :Figure 4 :34Figure 3: Prompt for answer generation. [model name] refers to HuatuoGPT-II, [domain] is medicine, and [question generated by LLM]] is the previously text-derived query.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "figure",
+            "figure_id": "fig_2",
+            "figure_caption": "Figure 6 :6Figure 6: The comparison results of One-stage Adaption and Two-stage Adaption. \"Only Finetuning\" refers to the model that only fine-tunes the backbone directly. Win Rate is the result scored by automatic evaluation using GPT-4.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "7",
+            "figure_type": "figure",
+            "figure_id": "fig_3",
+            "figure_caption": "Figure 7 :7Figure 7: Comparison of model performance under different relative priority β settings.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "9",
+            "figure_type": "figure",
+            "figure_id": "fig_4",
+            "figure_caption": "Figure 9 :9Figure 9: Summary of the Medical Pre-training Corpus.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_5",
+            "figure_caption": "demonstrates our method's ability to function independently of other LLMs, effectively enhancing the model's domain adaptation capabilities and outperforming traditional continuous pre-training.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "figure",
+            "figure_id": "fig_6",
+            "figure_caption": ")中是否存在与临床症状相关的脑区活性和结构改变？ ( Translation: Are there alterations in the activity and structure of brain regions associated with clinical symptoms in chronic spontaneous urticaria (CSU)? ) Answer of Data Unification (Generated by Baichuan2-7B-Chat) 在慢性自发性荨麻疹(CSU)中，确实存在与临床症状相关的脑区活性和结构改变。研究表明，大脑特别是纹状 体(striatum)在调节瘙痒方面起着关键作用。对于慢性瘙痒，如慢性自发性荨麻疹(CSU)... (Translation: In chronic spontaneous urticaria (CSU), alterations in the activity and structure of brain regions associated with clinical symptoms do exist. Studies have shown that the brain, especially the striatum (striatum), plays a key role in the regulation of itch. For chronic itch, such as chronic spontaneous urticaria (CSU)...)",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "figure",
+            "figure_id": "fig_8",
+            "figure_caption": "Figure 10 :10Figure 10: The interface of the expert evaluation.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_0",
+            "figure_caption": "The traditional two-stage pipeline adopts a completely separate form, first learning knowledge and then learning instructions to You are [model name] , equipped with in-depth knowledge in[domain]  . Your task is to directly answer the user's <question> in [target language] . In formulating your response, you must thoughtfully reference the <reference text>, ensuring that your reply does not disclose your reliance on <reference text>. Aim to provide a comprehensive and informative response, incorporating relevant insights from <reference text> to best assist the user. Please be cautious to avoid including any content that might raise ethical concerns.",
+            "figure_data": "<question>: [question generated by LLM]<reference text>: [domain-specific corpus]<reply>:"
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_1",
+            "figure_caption": "",
+            "figure_data": ", the benchmark results highlight HuatuoGPT-II's impres-"
+        },
+        {
+            "figure_label": "1",
+            "figure_type": "table",
+            "figure_id": "tab_2",
+            "figure_caption": "Medical benchmark results. Med. signifies extraction of only medical-related questions. '-' indicate that the model cannot follow the question and make a choice. Due to the too large size of these benchmarks, we exclude the testing of GPT-4 and ERNIE Bot here.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_3",
+            "figure_caption": "",
+            "figure_data": "DISC-MedLLM22.226.823.30.022.624.432.315.00.024.923.8HuatuoGPT25.625.523.32.623.424.126.831.67.524.924.2ChatGLM3-6B39.539.110.50.234.631.838.225.020.032.933.8Qwen-7B-chat43.846.833.318.441.940.043.233.317.538.840.4Qwen-14B-chat56.258.641.721.152.751.351.027.541.747.950.3Baichuan2-7B-Chat51.250.930.02.644.648.146.035.07.542.143.4Baichuan2-13B-Chat43.852.736.77.944.241.346.443.315.041.743.0ERNIE Bot (API)45.060.936.723.749.653.859.138.320.051.550.6ChatGPT (API)45.644.136.713.241.234.432.330.015.031.236.2GPT-4 (API)65.159.646.715.857.340.642.733.317.538.848.1HuatuoGPT-II(7B)41.961.035.015.747.752.551.441.715.047.547.6HuatuoGPT-II(13B)47.564.145.023.752.948.861.845.017.551.652.3"
+        },
+        {
+            "figure_label": "2",
+            "figure_type": "table",
+            "figure_id": "tab_4",
+            "figure_caption": "",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "3",
+            "figure_type": "table",
+            "figure_id": "tab_6",
+            "figure_caption": "Results of the Automated Evaluation Using GPT-4 and Expert Evaluation.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_7",
+            "figure_caption": "Comparison of the loss outcomes between proposed One-stage Adaption and conventional Two-stage Adaption using the same SFT data and medical corpus.",
+            "figure_data": "20 30 40 50 60 70 80 Performance (%)60.4% One-Stage Adapation 61.5% 52.3% 42.3%54.4%47.0%47.7% Two-Stage Adapation 41.8% 34.1%47.6%42.3% Only Fine-tuning 38.4% 54.0% 62.0%53.0%69.0%46.0%49.0%100 Figure 5: Acc. in 5000 10000 0.50 0.75 1.00 1.25 1.50 1.75 2.00 Loss One Stage HuatuoGPT-II (7B) 15000 Step 20000 CMB Acc. in CMMLU 02500030000 2023 Examination 35000 Loss 0.4 0.6 0.8 1.0 1.2 1.4 1.6 1.8 2.0 Acc. in (Pharmacist) 2023 Examination 0 5000 1st Stage: Pre-training 10000 15000 20000 25000 30000 35000 40000 Step 2nd Stage: Fine-tuning Acc. in (TCM) Win Rate (vs. ChatGPT) in Single-round QA Win Rate in Multi-round Dialogue (vs. ChatGPT)"
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_8",
+            "figure_caption": "",
+            "figure_data": "Mixed SamplingApproximateSequential Sampling..."
+        },
+        {
+            "figure_label": "5",
+            "figure_type": "table",
+            "figure_id": "tab_9",
+            "figure_caption": "Results of CMB-Clin on Automatic Evaluation using GPT-4.",
+            "figure_data": "Fluency Relevance Completeness Proficiency Avg.↑GPT-44.954.714.354.664.67HuatuoGPT-II (7B)4.944.564.244.464.55ERNIE Bot4.924.534.164.554.54ChatGPT4.974.494.124.534.53HuatuoGPT-II (13B)4.924.384.004.404.43Baichuan2-7B-Chat4.934.414.034.364.43Qwen-14B-Chat4.904.353.934.484.41Qwen-7B-Chat4.944.173.674.334.28Baichuan2-13B-Chat4.884.183.784.274.28ChatGLM3-6B4.924.113.744.234.25HuatuoGPT4.893.763.383.863.97DISC-MedLLM4.823.242.753.513.58USMLE The United States Medical Licensing Examination (USMLE) outcomes, as delineated inTable 6, reveal that HuatuoGPT-II (13B) outperforms comparative open-source models. Despite adiscernible disparity with ChatGPT, it is important to note that the USMLE's English-centric natureimposes constraints on HuatuoGPT-II, primarily designed for Chinese medical contexts. However,its commendable performance in the USMLE underscores its proficiency in employing medicalknowledge across diverse scenarios, effectively addressing the range of challenges posed by theUSMLE.C Domain Corpus CollectionDomain corpus is pivotal for augmenting domain-specific expertise. Domain data necessitates acomprehensive collection of high-quality and domain-specific content, surpassing the scope of the"
+        },
+        {
+            "figure_label": "6",
+            "figure_type": "table",
+            "figure_id": "tab_10",
+            "figure_caption": "The results of The United States Medical Licensing Examination (USMLE) from MedQA. The blue fonts indicate the number of questions.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "8",
+            "figure_type": "table",
+            "figure_id": "tab_12",
+            "figure_caption": "Experiment on data scale.",
+            "figure_data": "Tuning Data # Pre-Training Data 2023 Exam (Pharmacist) 2023 Exam (TCM)#13.6K131.3K38.937.7#23.6K + 60K131.3K37.738.1#33.6K131.3K + 60K37.940.0#43.6K + 120K131.3K37.335.7#53.6K131.3K + 120K39.640.2"
+        },
+        {
+            "figure_label": "10",
+            "figure_type": "table",
+            "figure_id": "tab_13",
+            "figure_caption": "An example of QA data generated by Baichuan2-7B-Chat.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_14",
+            "figure_caption": "",
+            "figure_data": "Two-stage, Without Data Unification50.538.838.3One-stage, Without Data Unification49.337.235.6One-stage, With Data Unification53.439.740.2"
+        },
+        {
+            "figure_label": "11",
+            "figure_type": "table",
+            "figure_id": "tab_15",
+            "figure_caption": "Performance comparison: with vs. without Data Unification.",
+            "figure_data": ""
+        },
+        {
+            "figure_label": "",
+            "figure_type": "table",
+            "figure_id": "tab_16",
+            "figure_caption": "",
+            "figure_data": "Single-round QAMulti-round DialogueAverageHuatuoGPT-HuatuoGPT-II(7B) vs HuatuoGPT-II(13B)39223941134657.5%HuatuoGPT-II(7B) vs ERNIE Bot62132664122475.0%HuatuoGPT-II(7B) vs ChatGLM3-6B75111476101486.0%HuatuoGPT-II(7B) vs Baichuan2-7B-Chat75718847986.5%HuatuoGPT-II(7B) vs DISC-MedLLM8081273151288.0%HuatuoGPT-II(7B) vs Qwen-14B-Chat82767991291.0%HuatuoGPT-II(7B) vs Qwen-7B-Chat896575121391.0%"
+        },
+        {
+            "figure_label": "13",
+            "figure_type": "table",
+            "figure_id": "tab_17",
+            "figure_caption": "Results of the Automated Evaluation Using GPT-4 in Chinese medical scenarios.",
+            "figure_data": "你是一名患者，下面是你的病情，你正在向医生咨询病情相关的问题，注意这是一个多轮问诊过程，切记不要让对话结束，要继续追问医生病情有关的问题。[Patient Case Information]Translation:"
+        },
+        {
+            "figure_label": "15",
+            "figure_type": "table",
+            "figure_id": "tab_18",
+            "figure_caption": "/No Question Open-ended Question Comparison Question Causal Question Distribution of synthesized questions.",
+            "figure_data": "# Question1247932"
+        },
+        {
+            "figure_label": "16",
+            "figure_type": "table",
+            "figure_id": "tab_19",
+            "figure_caption": "Performance on different sizes of models.",
+            "figure_data": "Model SizeBackboneCMExam 2023 Pharmacist 2023 TCM7BBaichuan2-7B65.847.747.513BBaichuan2-13B69.052.951.634BYi-34B77.265.562.4"
+        },
+        {
+            "figure_label": "17",
+            "figure_type": "table",
+            "figure_id": "tab_20",
+            "figure_caption": "Results on different SFT data",
+            "figure_data": "CMExam 2023 Pharmacist 2023 TCM"
+        },
+        {
+            "figure_label": "18",
+            "figure_type": "table",
+            "figure_id": "tab_21",
+            "figure_caption": "as the pre-training corpus and used its training set for SFT. The data characteristics are as follows: Dataset characteristics in other domains. We trained on Baichuan2-7B-Base and compared one-stage training with traditional two-stage training:",
+            "figure_data": "Dataset# Pre-training documents # SFT data # Test dataDomainMedQA-en156,96010,1781,273English Medical DomainCaseHOLD141,34245,0003,900Law DomainMethodMedQA-en (English Medical Domain) CaseHOLD (Law Domain)Two-stage training46.241.8One-stage training48.643.6"
+        },
+        {
+            "figure_label": "19",
+            "figure_type": "table",
+            "figure_id": "tab_22",
+            "figure_caption": "Performance comparison of training methods across domainsThe results indicate that one-stage training can enhance performance across domains.",
+            "figure_data": ""
+        }
+    ],
+    "formulas": [
+        {
+            "formula_id": "formula_0",
+            "formula_text": "P t (x) = π(x) ∑ y∈D-S t π(y)",
+            "formula_coordinates": [
+                5.0,
+                256.76,
+                563.86,
+                97.5,
+                23.57
+            ]
+        },
+        {
+            "formula_id": "formula_1",
+            "formula_text": "π(x ∈ D t i ) = β K i .",
+            "formula_coordinates": [
+                6.0,
+                91.93,
+                96.14,
+                75.64,
+                14.28
+            ]
+        },
+        {
+            "formula_id": "formula_2",
+            "formula_text": "P t (x ∈ D t i ) = |D t i |β K i ∑ n j=1 |D t j |β K j",
+            "formula_coordinates": [
+                6.0,
+                247.4,
+                116.11,
+                115.26,
+                30.3
+            ]
+        },
+        {
+            "formula_id": "formula_3",
+            "formula_text": "D t+1 i becomes |D t+1 i | = |D t i | -1, resulting in: P t+1 (x ∈ D t+1 i ) < P t (x ∈ D t i ).",
+            "formula_coordinates": [
+                6.0,
+                92.13,
+                154.18,
+                429.32,
+                28.84
+            ]
+        },
+        {
+            "formula_id": "formula_4",
+            "formula_text": "Exper. No. # Fine-",
+            "formula_coordinates": [
+                19.0,
+                97.31,
+                298.28,
+                83.7,
+                8.84
+            ]
+        },
+        {
+            "formula_id": "formula_5",
+            "formula_text": "Description content Raw Data(from PubMed)",
+            "formula_coordinates": [
+                20.0,
+                91.8,
+                294.03,
+                106.45,
+                27.76
+            ]
+        }
+    ],
+    "doi": ""
+}
