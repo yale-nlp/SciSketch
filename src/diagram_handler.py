@@ -215,10 +215,10 @@ def get_author_image(title: str, description: str, candidate_list: list, engine:
 
     return image_index, "author"
 
-def generate_replacement_plan(diagram: str, candidate_list: list = [], engine:str = ENGINE_CONFIGS['element_discriminator']) -> list:
+def generate_replacement_plan(description: str, candidate_list: list = [], engine:str = ENGINE_CONFIGS['element_discriminator']) -> list:
     # Replacement plan for components by llm
     replacement_prompt = component_replacement_planning_prompt.replace(
-        "{diagram}", diagram
+        "{description}", description
     ).replace("{image_ids}", json.dumps(candidate_list))
     logger.debug(f"Replacement prompt:\n {replacement_prompt}")
 
@@ -243,7 +243,7 @@ def generate_replacement_images(plan: list, candidate_list: list) -> list:
     """
     images = []
     for component in plan:
-        if component.get("source", "") == "svg":
+        if component.get("source", "") == "svg" or len(candidate_list) == 0:
             svg_image = generate_svg_image(
                 component["name"], component["description"], component["width"], component["height"]
             )
@@ -252,8 +252,6 @@ def generate_replacement_images(plan: list, candidate_list: list) -> list:
             index, source = get_author_image(component["name"], component["description"], candidate_list)
             if 0 <= index < len(candidate_list):
                 images.append({"id": component["id"], "mime_type": candidate_list[index]["mime_type"],"base64": candidate_list[index]["base64"], "source": source, "value": component["value"]})
-            # else:
-            #     images.append({"id": component["id"], "image": image, "source": source, "value": component["title"]})
     return images
 
 def replace_components_with_images(description: str, diagram: str, candidate_list: list = [], engine:str = ENGINE_CONFIGS['element_discriminator']) -> Tuple[str, list]:

@@ -41,9 +41,11 @@ You could follow the following steps:
 1. analyze the description and identify the type, textual elements, graphical elements and layout of the figure
 2. generate the executable {language} code for all the components and layout
 3. make sure the code covers all the components of the description
-4. for graphical elements (e.g., images, icons), insert an placeholder node with the format: `"style="shape=image;"` without the actual visual content.
+4. for graphical elements (e.g., images, icons), insert an placeholder node with the format: `"style="shape=image;"` \
+without the actual visual content, but the id should be the name of the element.
 5. use clear layout: left-to-right or top-down pipeline structure.
-6. return your result in a code block wrapped with ```
+6. do not generate legends for the figure
+7. return your result in a code block wrapped with ```
 
 Think step by step and make sure the diagram is clear and matches the description and the caption.
 
@@ -52,7 +54,7 @@ Description:
 Code:
 """
 
-refinement_prompt = """You are an expert in planning and designing a scientific figure with the {language}. \
+refinement_prompt = """You are an expert in evaluating a scientific figure with the {language}. \
 Given the description, the caption and the code of the figure, you need to check if there is any improvement \
 in terms of logic and visual quality. 
 
@@ -69,9 +71,9 @@ You should follow the following steps:
 You will first need to decide if any improvement is needed. You should wrap your decision inside the <decision></decision> tag.
 You should only input yes or no inside the <decision></decision> tag.
 
-If the decision is yes, you should then generate the improved code in a code block wrapped with ```.
+If the decision is yes, you should then generate the improved code in a code block wrapped with ```. Output the entire enhanced code, not just the modified portions.
 
-Think step by step and make sure the code is self-contained and executable.
+Think step by step and output your reasoning behind your answer.
 
 Description:
 {description}
